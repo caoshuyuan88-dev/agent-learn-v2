@@ -14,6 +14,8 @@
 
 - [Python 基础、类型注解、面向对象、异常处理与 asyncio](Python基础-类型注解-面向对象-异常处理-asyncio.md)
 - [Pydantic 学习文档](Pydantic-学习文档.md)
+- [FastAPI 学习文档](FastAPI学习文档.md)
+- [HTTPX 学习文档](HTTPX学习文档.md)
 
 后续文档示例：
 

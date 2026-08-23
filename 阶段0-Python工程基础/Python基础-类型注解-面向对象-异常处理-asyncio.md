@@ -101,10 +101,141 @@ user = {"id": 1, "name": "Alice"}
 
 选择容器时可以这样判断：
 
-- `list`：有顺序、允许重复、需要增删元素
-- `tuple`：有顺序、不希望修改的数据组合
-- `set`：去重和集合运算
-- `dict`：通过键查找值
+| 容器 | 是否有顺序 | 是否允许重复 | 是否可变 | 访问方式 | 典型用途 |
+|---|---|---|---|---|---|
+| `list` | 有，按位置排列 | 允许 | 可变 | 通过整数索引或切片 | 一组需要按顺序处理的数据 |
+| `tuple` | 有，按位置排列 | 允许 | 不可变 | 通过整数索引或切片 | 不希望被修改的数据组合 |
+| `set` | 不提供稳定的位置访问 | 不允许，自动去重 | 可变 | 通过成员判断，不能用索引 | 去重、集合运算、快速判断成员 |
+| `dict` | 保持插入顺序 | 键不能重复，重复键会覆盖旧值 | 可变 | 通过键访问值 | 表示字段和值、快速查找 |
+
+### 3.3.1 list：有顺序、可修改、允许重复
+
+列表适合表示一组需要按顺序处理的数据。它支持索引、切片、追加、删除和排序：
+
+```python
+tasks = ["学习 Python", "学习 FastAPI", "学习 Python"]
+
+first_task = tasks[0]
+last_tasks = tasks[-2:]
+tasks.append("学习 HTTPX")
+tasks.remove("学习 FastAPI")
+```
+
+列表的特点：
+
+- 元素有固定位置，可以通过 `tasks[0]` 访问第一个元素。
+- 可以包含重复值，适合保留原始记录或事件序列。
+- 可以修改、增加和删除元素。
+- `append()` 末尾追加通常是 $O(1)$；按索引读取通常是 $O(1)$。
+- 在列表中查找某个值通常是 $O(n)$；中间位置插入或删除也通常是 $O(n)$，因为后续元素需要移动。
+
+### 3.3.2 tuple：有顺序、不可修改
+
+元组和列表一样支持位置访问和重复值，但创建后不能修改：
+
+```python
+coordinates = (31.2, 121.5)
+longitude = coordinates[0]
+latitude = coordinates[1]
+```
+
+元组的特点：
+
+- 有顺序，可以通过索引访问。
+- 不能追加、删除或替换元素。
+- 适合表达固定结构，例如坐标、函数返回的多个固定结果。
+- 不可变本身不代表内部对象一定不可变；如果元组中放了列表，该列表仍然可以修改。
+- 如果元组中的所有元素都可哈希，元组可以作为字典的键或集合元素。
+
+```python
+result = ("success", 200)
+status, code = result
+```
+
+当数据代表“固定的几个位置”时使用元组；当数据需要持续增删时使用列表。
+
+### 3.3.3 set：无重复、适合成员判断
+
+集合主要用于去重和集合运算，不提供按位置访问：
+
+```python
+tags = {"python", "agent", "python"}
+print(tags)  # "python" 只保留一份
+
+if "agent" in tags:
+    print("这是 Agent 相关标签")
+```
+
+集合的特点：
+
+- 不允许重复元素，添加重复值不会产生第二份数据。
+- 不能使用 `tags[0]`，因为集合不是按位置访问的容器。
+- 可以添加和删除元素，但集合中的元素必须是可哈希对象，例如字符串、整数和不可变元组。
+- 成员判断、添加和删除平均为 $O(1)$，适合频繁判断某个值是否存在。
+- 不应依赖集合的遍历顺序。如果业务需要稳定顺序，应使用列表。
+
+常用集合运算：
+
+```python
+backend_tags = {"python", "java", "sql"}
+agent_tags = {"python", "agent", "rag"}
+
+common_tags = backend_tags & agent_tags       # 交集
+all_tags = backend_tags | agent_tags          # 并集
+only_backend = backend_tags - agent_tags     # 差集
+```
+
+### 3.3.4 dict：键值映射
+
+字典通过键查找值，适合表示结构化字段或建立索引：
+
+```python
+user = {
+    "id": 1,
+    "name": "Alice",
+    "roles": ["developer"],
+}
+
+user_name = user["name"]
+user["active"] = True
+```
+
+字典的特点：
+
+- 每个键只能对应一个值；重复键会覆盖之前的值。
+- Python 3.7+ 保持键的插入顺序，但字典的主要用途仍是按键查找，不是按位置访问。
+- 键必须是可哈希对象，常见的是字符串、整数和不可变元组；值可以是任意对象。
+- 通过键查找、插入和删除平均为 $O(1)$。
+- `key in user` 判断的是键是否存在，不是值是否存在。
+
+```python
+if "name" in user:
+    print(user["name"])
+
+for key, value in user.items():
+    print(key, value)
+```
+
+### 3.3.5 如何选择
+
+可以用下面的问题快速选择容器：
+
+1. 需要通过名称查找字段吗？使用 `dict`。
+2. 需要去重或频繁判断成员是否存在吗？使用 `set`。
+3. 数据按顺序排列，并且后续需要修改吗？使用 `list`。
+4. 数据按顺序排列，但结构固定且不希望修改吗？使用 `tuple`。
+
+一个常见的组合是：
+
+```python
+user = {
+    "id": 1,
+    "roles": {"developer", "reviewer"},
+    "recent_tasks": ["学习 Python", "学习 FastAPI"],
+}
+```
+
+这里用字典表示用户字段，用集合表示不重复的角色，用列表表示有顺序的任务记录。
 
 字典读取：
 
@@ -132,9 +263,19 @@ else:
 for name in names:
     print(name)
 
+# enumerate 同时返回元素的索引和值；start=1 表示索引从 1 开始
 for index, name in enumerate(names, start=1):
     print(index, name)
 ```
+
+如果 `names = ["Alice", "Bob"]`，上面的循环会依次得到：
+
+```text
+(1, "Alice")
+(2, "Bob")
+```
+
+因此，`index` 是当前元素的编号，`name` 是当前元素本身。`enumerate` 比手动定义并递增计数器更简洁，也不容易因为忘记递增计数器而出错。`start` 默认为 `0`，如果希望编号从其他数字开始，可以传入对应的值，例如 `start=1`。
 
 字典遍历：
 
@@ -234,6 +375,170 @@ def build_message(name: str) -> str:
     message = f"Hello, {name}"
     return message
 ```
+
+### 4.4.1 作用域和 LEGB 规则
+
+作用域是变量名可以被查找的范围。Python 查找一个变量名时，通常按照下面的顺序进行：
+
+```text
+L - Local：当前函数内部的局部作用域
+E - Enclosing：外层函数的作用域
+G - Global：当前模块文件的全局作用域
+B - Built-in：Python 内置名称，例如 len、print
+```
+
+例如：
+
+```python
+message = "模块级变量"
+
+
+def show_message() -> None:
+    message = "函数内变量"
+    print(message)
+
+
+show_message()  # 输出：函数内变量
+print(message)  # 输出：模块级变量
+```
+
+函数内部定义的 `message` 会遮蔽同名的全局变量，但不会修改全局变量。局部变量和全局变量只是同名，并不是同一个变量。
+
+### 4.4.2 读取和修改全局变量
+
+在函数中读取全局变量通常不需要 `global`：
+
+```python
+default_timeout = 10
+
+
+def get_timeout() -> int:
+    return default_timeout
+```
+
+但是，如果要在函数中给全局变量重新赋值，就必须使用 `global`：
+
+```python
+request_count = 0
+
+
+def record_request() -> None:
+    global request_count
+    request_count += 1
+```
+
+`global request_count` 的含义是：当前函数中的 `request_count` 指向模块级变量，而不是创建一个新的局部变量。
+
+如果省略 `global`：
+
+```python
+request_count = 0
+
+
+def record_request() -> None:
+    request_count += 1
+```
+
+Python 会把函数中的 `request_count` 判断为局部变量。但在执行加法前它还没有局部初始值，因此会抛出 `UnboundLocalError`。
+
+### 4.4.3 为什么不推荐滥用 global
+
+`global` 本身不是语法错误，但会引入共享可变状态，常见问题包括：
+
+- 函数依赖隐藏在模块变量中，调用者无法从参数看出依赖。
+- 多个函数都能修改同一个值，执行顺序会影响结果。
+- 测试之间可能互相污染，需要额外重置全局状态。
+- 异步服务中多个请求共享状态，容易产生竞态问题。
+- 多进程部署时，不同进程拥有不同的全局变量，状态不会自动同步。
+- Agent 服务扩容后，使用全局变量保存会话、计数器或任务状态通常是不可靠的。
+
+例如，不推荐用全局变量保存用户会话：
+
+```python
+current_user_id: int | None = None
+```
+
+在 FastAPI 或 Agent 服务中，更好的方案通常是：
+
+- 通过函数参数显式传递状态。
+- 使用类封装相关状态，并通过依赖注入传入。
+- 使用数据库或 Redis 保存需要跨请求、跨进程共享的数据。
+- 使用 `contextvars` 保存请求范围内的上下文，例如请求标识。
+
+```python
+class RequestCounter:
+    def __init__(self) -> None:
+        self._count = 0
+
+    def record(self) -> int:
+        self._count += 1
+        return self._count
+
+
+counter = RequestCounter()
+```
+
+这个例子仍然有一个对象实例，但依赖是显式的，也更容易在测试中创建新的 `RequestCounter`。
+
+### 4.4.4 闭包
+
+闭包是一个函数记住并使用其外层函数变量的现象。即使外层函数已经执行结束，内部函数仍然可以访问这些变量：
+
+```python
+def make_prefixer(prefix: str):
+    def add_prefix(text: str) -> str:
+        return f"{prefix}: {text}"
+
+    return add_prefix
+
+
+error_prefixer = make_prefixer("错误")
+print(error_prefixer("请求失败"))  # 输出：错误: 请求失败
+```
+
+这里 `add_prefix` 是内部函数，它捕获了外层函数的 `prefix`。`error_prefixer` 保存的不是普通字符串，而是一个带有记忆能力的函数。
+
+闭包适合：
+
+- 创建带固定配置的函数
+- 简单的装饰器
+- 封装少量私有状态
+
+如果闭包中需要修改外层变量，需要使用 `nonlocal`：
+
+```python
+def make_counter() -> callable:
+    count = 0
+
+    def next_count() -> int:
+        nonlocal count
+        count += 1
+        return count
+
+    return next_count
+
+
+next_count = make_counter()
+print(next_count())  # 1
+print(next_count())  # 2
+```
+
+`nonlocal` 表示使用最近的外层函数变量；它和 `global` 的区别是：
+
+| 关键字 | 修改的变量位置 | 常见用途 |
+|---|---|---|
+| `global` | 当前模块的全局作用域 | 访问或修改模块级变量 |
+| `nonlocal` | 外层函数的作用域 | 在闭包中修改外层函数变量 |
+
+闭包可以解决小范围状态封装问题，但对于复杂业务状态，类、数据对象、数据库或 Redis 通常更清晰。
+
+### 4.4.5 作用域中的常见误区
+
+1. 在函数内给外部同名变量赋值，不会自动修改外部变量。
+2. 只读取全局变量不需要 `global`，重新赋值才需要。
+3. `global` 只影响当前模块，不会让变量自动跨文件、跨进程共享。
+4. `nonlocal` 只能用于嵌套函数，不能用于模块级变量。
+5. 列表或字典即使没有 `global`，也可能通过方法修改全局对象的内容；因此可变对象仍要谨慎共享。
 
 尽量少使用 `global`。如果多个函数共享状态，优先使用类、数据对象或显式传参表达依赖。
 
@@ -348,7 +653,156 @@ def update_status(status: TaskStatus) -> None:
     print(status)
 ```
 
-`Literal` 适合表示有限的字符串选项。更复杂的业务状态可以使用 `Enum`。
+#### 6.3.1 类型别名是什么
+
+类型别名就是给一个已有类型起一个更有业务含义的名字：
+
+```python
+from typing import TypeAlias
+
+
+UserId: TypeAlias = int
+
+
+def find_user(user_id: UserId) -> str | None:
+    print(user_id)
+    return None
+```
+
+这里的 `UserId` 本质上仍然是 `int`，它不会创建新的运行时类型，也不会自动检查传入值。它的主要作用是让代码更容易阅读，并让类型检查工具理解业务含义。
+
+```python
+TaskId: TypeAlias = int
+OrderId: TypeAlias = int
+```
+
+虽然 `TaskId` 和 `OrderId` 在业务上代表不同的东西，但上面的写法不会阻止你把一个整数 ID 传给另一个函数。如果需要真正区分它们，应使用包装类或 `NewType`：
+
+```python
+from typing import NewType
+
+
+UserId = NewType("UserId", int)
+
+
+def find_user(user_id: UserId) -> None:
+    print(user_id)
+```
+
+阶段 0 先掌握普通类型别名即可，`NewType` 了解概念就够了。
+
+#### 6.3.2 Literal 是什么
+
+`Literal` 可以理解为“允许值的白名单”。普通的 `str` 表示可以是任意字符串：
+
+```python
+def set_status(status: str) -> None:
+    print(status)
+
+
+set_status("todo")
+set_status("这是一个拼写错误")  # 类型检查工具也无法判断它是不是合法状态
+```
+
+如果状态只有几个固定值，就可以用 `Literal` 明确告诉 Pyright 或 mypy：
+
+```python
+from typing import Literal
+
+
+TaskStatus = Literal["todo", "doing", "done"]
+
+
+def update_status(status: TaskStatus) -> None:
+    print(status)
+
+
+update_status("todo")  # 正确
+update_status("done")  # 正确
+update_status("finished")  # 类型检查错误：不在允许值列表中
+```
+
+因此：
+
+```text
+str                         -> 任意字符串
+Literal["todo", "done"]    -> 只能是这两个具体字符串
+```
+
+`Literal` 不只是说明“这是字符串”，而是进一步说明“这个字符串只能取哪些具体值”。它也可以用于整数、布尔值等：
+
+```python
+RetryCount = Literal[0, 1, 2, 3]
+Enabled = Literal[True, False]
+```
+
+#### 6.3.3 Literal 和运行时校验的区别
+
+`Literal` 主要服务于静态类型检查。Python 直接运行时不会因为传入了错误字符串就自动抛异常：
+
+```python
+update_status("finished")  # 直接运行 Python 时仍可能执行
+```
+
+因此需要区分两个场景：
+
+| 场景 | 推荐方式 |
+|---|---|
+| 编写代码时限制函数调用者的可选值 | `Literal` |
+| HTTP、LLM 或用户输入的运行时校验 | Pydantic `Literal` 字段或 `Enum` |
+| 需要成员、方法或更复杂行为的状态对象 | `Enum` |
+
+在 Pydantic 模型中，`Literal` 会参与运行时校验：
+
+```python
+from typing import Literal
+
+from pydantic import BaseModel
+
+
+class TaskUpdate(BaseModel):
+    status: Literal["todo", "doing", "done"]
+
+
+TaskUpdate(status="doing")  # 校验通过
+TaskUpdate(status="finished")  # ValidationError
+```
+
+这正适合 FastAPI 请求和 Agent 工具参数：模型输出的状态必须属于预先定义的集合。
+
+#### 6.3.4 Literal 和 Enum 怎么选择
+
+简单选项可以使用 `Literal`：
+
+```python
+SortOrder = Literal["asc", "desc"]
+```
+
+当状态需要复用、显示名称、方法或更多业务行为时，可以使用 `Enum`：
+
+```python
+from enum import Enum
+
+
+class TaskStatus(str, Enum):
+    TODO = "todo"
+    DOING = "doing"
+    DONE = "done"
+
+
+def update_status(status: TaskStatus) -> None:
+    if status is TaskStatus.DONE:
+        print("任务已完成")
+```
+
+可以这样记忆：
+
+```text
+Literal：我只允许这几个值，简单直接
+Enum：我需要一个有名字、可复用、可以承载行为的状态类型
+```
+
+在 Agent 工具参数中，查询方向、任务状态、输出格式等简单选项适合使用 `Literal`；如果状态在多个模块中反复出现，或者需要附加行为，使用 `Enum` 更合适。
 
 ### 6.4 TypedDict
 
@@ -371,7 +825,9 @@ def display_user(user: UserData) -> str:
 
 ### 6.5 Protocol
 
-`Protocol` 用于描述“只要具备这些方法，就可以被使用”的接口：
+`Protocol` 用于描述“只要具备这些方法，就可以被使用”的接口。它体现的是鸭子类型：如果一个对象像鸭子一样会走、会叫，那么代码可以按鸭子的方式使用它，而不要求这个对象必须继承某个特定的父类。
+
+#### 6.5.1 最基本的用法
 
 ```python
 from typing import Protocol
@@ -386,15 +842,409 @@ def notify(sender: MessageSender, message: str) -> None:
     sender.send(message)
 ```
 
+下面的类没有继承 `MessageSender`，但它有一个符合要求的 `send` 方法，因此可以传给 `notify`：
+
+```python
+class EmailSender:
+    def send(self, message: str) -> None:
+        print(f"发送邮件: {message}")
+
+
+class LogSender:
+    def send(self, message: str) -> None:
+        print(f"写入日志: {message}")
+
+
+notify(EmailSender(), "任务完成")
+notify(LogSender(), "任务完成")
+```
+
+这里的关键不是 `EmailSender` 和 `LogSender` 是否继承了 `MessageSender`，而是它们都具备 `send(message: str) -> None` 这个能力。Pyright 或 mypy 会根据方法签名判断它们是否符合协议。
+
+可以把 `Protocol` 理解成一份“使用方需要什么能力”的说明：
+
+```text
+notify 不关心你具体是什么类
+notify 只要求你有一个 send 方法
+```
+
+#### 6.5.2 Protocol 与继承的区别
+
+传统继承通常要求实现类明确继承父类：
+
+```python
+from abc import ABC, abstractmethod
+
+
+class MessageSenderBase(ABC):
+    @abstractmethod
+    def send(self, message: str) -> None:
+        raise NotImplementedError
+
+
+class EmailSender(MessageSenderBase):
+    def send(self, message: str) -> None:
+        print(message)
+```
+
+`Protocol` 和抽象基类的主要区别：
+
+| 对比项 | `Protocol` | 抽象基类 `ABC` |
+|---|---|---|
+| 是否必须显式继承 | 不需要 | 通常需要 |
+| 判断方式 | 看对象是否具备所需方法和属性 | 看类的继承关系和抽象方法实现 |
+| 主要作用 | 静态类型检查和解耦 | 建立明确的类层次和运行时约束 |
+| 适合场景 | 外部客户端、测试替身、可替换依赖 | 需要统一生命周期或强制继承关系 |
+
+如果你只需要表达“调用方需要哪些方法”，优先考虑 `Protocol`。如果你需要共享父类实现、定义类变量，或者必须让实现类遵守明确的继承层次，可以考虑抽象基类。
+
+#### 6.5.3 Agent 项目中的异步 Protocol
+
+Agent 服务经常需要替换不同的模型客户端。可以定义一个异步协议：
+
+```python
+from typing import Protocol
+
+
+class LLMClient(Protocol):
+    async def complete(self, prompt: str) -> str:
+        ...
+
+
+class CloudLLMClient:
+    async def complete(self, prompt: str) -> str:
+        return f"云模型响应: {prompt}"
+
+
+class FakeLLMClient:
+    async def complete(self, prompt: str) -> str:
+        return "测试响应"
+
+
+class AgentService:
+    def __init__(self, llm_client: LLMClient) -> None:
+        self.llm_client = llm_client
+
+    async def answer(self, question: str) -> str:
+        return await self.llm_client.complete(question)
+```
+
+`AgentService` 不依赖某一家模型供应商，只依赖 `LLMClient` 规定的能力。生产环境可以传入 `CloudLLMClient`，测试中可以传入 `FakeLLMClient`：
+
+```python
+service = AgentService(FakeLLMClient())
+```
+
+这就是依赖倒置的一个简单体现：业务服务依赖抽象能力，而不是依赖具体客户端类。
+
+#### 6.5.4 Protocol 可以描述属性
+
+协议不只能描述方法，也可以描述必须存在的属性：
+
+```python
+from typing import Protocol
+
+
+class HasRequestId(Protocol):
+    request_id: str
+
+
+def log_request(request: HasRequestId) -> None:
+    print(request.request_id)
+```
+
+只要传入的对象有一个 `request_id: str` 属性，类型检查工具就可以认为它满足这个协议。
+
+#### 6.5.5 `runtime_checkable` 的限制
+
+默认情况下，`Protocol` 主要用于静态类型检查，不能直接这样进行运行时判断：
+
+```python
+# 默认不应该用 isinstance(sender, MessageSender) 做判断
+```
+
+如果确实需要进行简单的运行时成员检查，可以使用 `runtime_checkable`：
+
+```python
+from typing import Protocol, runtime_checkable
+
+
+@runtime_checkable
+class MessageSender(Protocol):
+    def send(self, message: str) -> None:
+        ...
+```
+
+之后可以检查对象是否具有名为 `send` 的属性：
+
+```python
+is_sender = isinstance(EmailSender(), MessageSender)
+```
+
+需要注意，`runtime_checkable` 的运行时检查主要检查成员是否存在，不会完整检查参数类型和返回值类型。因此它不能代替 Pydantic 校验，也不能代替 Pyright 或 mypy。
+
+#### 6.5.6 Protocol、TypedDict 和 Pydantic 的区别
+
+这三个工具解决的问题不同：
+
+| 工具 | 主要描述对象 | 是否自动进行运行时数据校验 |
+|---|---|---|
+| `Protocol` | 一个对象需要具备哪些方法或属性 | 否 |
+| `TypedDict` | 一个字典有哪些键及其类型 | 否 |
+| Pydantic `BaseModel` | 外部数据的结构和校验规则 | 是 |
+
+可以这样选择：
+
+```text
+外部 JSON、HTTP 请求、LLM 输出
+  -> Pydantic BaseModel
+
+内部字典结构的类型提示
+  -> TypedDict
+
+外部客户端需要提供哪些方法
+  -> Protocol
+```
+
 这适合为外部服务定义轻量抽象，测试时可以传入假的实现。
 
 ### 6.6 类型检查
 
-使用 Pyright 检查项目：
+#### 6.6.1 类型检查是什么
+
+Python 是动态类型语言。下面的代码可以启动，但可能在运行到某一行时才失败：
+
+```python
+def add_tax(price: float) -> float:
+    return price * 1.13
+
+
+result = add_tax("100")
+```
+
+静态类型检查工具会在运行程序之前分析代码，并指出 `add_tax` 需要 `float`，却传入了字符串。它主要帮助发现：
+
+- 函数参数类型传错
+- 返回值类型不符合声明
+- 访问了可能为 `None` 的对象
+- 字典或对象使用了不存在的字段
+- 列表中混入了不符合声明的元素
+- 异步函数忘记 `await`
+- 实现类不符合 `Protocol` 要求
+
+类型检查不是运行时校验：
+
+```text
+Pyright / mypy：检查源代码中的类型关系
+Pydantic：检查程序运行时收到的数据
+pytest：验证程序行为是否符合预期
+```
+
+三者解决的问题不同，不能互相完全替代。
+
+#### 6.6.2 Pyright 和 mypy 怎么选
+
+Pyright 和 mypy 都是 Python 静态类型检查工具。你使用 VS Code，阶段 0 建议先选择：
+
+```text
+Pyright + Pylance
+```
+
+原因是 Pyright 与 VS Code 的类型提示、跳转和错误显示配合紧密。进入团队项目后，如果项目已经统一使用 mypy，应遵循项目现有配置，不要在同一个项目中无理由维护两套规则。
+
+简单对比：
+
+| 工具 | 适合场景 | 使用方式 |
+|---|---|---|
+| Pyright | VS Code 开发、快速反馈、Pylance 集成 | 编辑器提示或命令行 |
+| mypy | 已有 mypy 配置的团队项目、CI 检查 | 命令行和 CI |
+
+#### 6.6.3 安装和运行 Pyright
+
+可以通过 npm 安装命令行版本：
+
+```bash
+npm install --global pyright
+```
+
+也可以直接使用 VS Code 中的 Pylance 获得编辑器内的类型诊断。项目检查命令：
 
 ```bash
 pyright
 ```
+
+检查指定文件或目录：
+
+```bash
+pyright app/main.py
+pyright app tests
+```
+
+检查结果通常包含文件、行列位置、错误级别和原因。先修复真正的错误，再处理信息级提示，不要一开始就用注释把所有问题隐藏掉。
+
+#### 6.6.4 类型检查级别和配置
+
+Pyright 可以通过 `pyrightconfig.json` 配置检查范围和严格程度：
+
+```json
+{
+  "include": ["app", "tests"],
+  "exclude": [".venv", "build"],
+  "typeCheckingMode": "basic",
+  "reportMissingImports": true
+}
+```
+
+常见级别：
+
+```text
+off      -> 基本不检查
+basic    -> 适合刚开始学习
+standard -> 更严格
+strict   -> 对大型项目和关键模块要求更高
+```
+
+阶段 0 可以从 `basic` 开始，熟悉错误后逐步提高到 `standard`。如果整个项目还没有类型注解，不建议直接开启 `strict`，否则初期会出现大量噪音。
+
+也可以用 `pyproject.toml` 配置：
+
+```toml
+[tool.pyright]
+include = ["app", "tests"]
+exclude = [".venv", "build"]
+typeCheckingMode = "basic"
+```
+
+#### 6.6.5 常见类型错误
+
+参数类型不匹配：
+
+```python
+def greet(name: str) -> str:
+    return f"Hello, {name}"
+
+
+greet(123)  # 错误：需要 str，却传入 int
+```
+
+修复方式是修正调用方，或者修正函数契约。如果函数确实要支持多种类型，应明确声明：
+
+```python
+def greet(name: str | int) -> str:
+    return f"Hello, {name}"
+```
+
+可能为 `None`：
+
+```python
+def find_name(user_id: int) -> str | None:
+    return None
+
+
+name = find_name(1)
+if name is not None:
+    print(name.upper())
+```
+
+返回值不符合声明：
+
+```python
+def get_status() -> int:
+    return "ok"  # 错误：声明返回 int，却返回 str
+```
+
+容器元素类型不一致：
+
+```python
+task_ids: list[int] = [1, 2]
+task_ids.append("3")  # 错误：list[int] 不能添加 str
+```
+
+如果外部输入是字符串，应先明确转换并校验。来自 HTTP 或 LLM 的输入则应使用 Pydantic 模型处理运行时校验。
+
+#### 6.6.6 类型收窄
+
+类型检查工具可以根据条件判断缩小变量类型：
+
+```python
+def display_name(name: str | None) -> str:
+    if name is None:
+        return "匿名用户"
+    return name.upper()
+```
+
+进入 `if` 之后，工具知道 `name` 是 `None`；进入后面的分支时，工具知道 `name` 是 `str`。常见的类型收窄方式有：
+
+- `is None` 或 `is not None`
+- `isinstance(value, str)`
+- `in` 判断有限字符串选项
+- `match` 或 `if` 判断 `Literal` 和 `Enum`
+
+```python
+def format_value(value: str | int) -> str:
+    if isinstance(value, str):
+        return value.upper()
+    return str(value)
+```
+
+#### 6.6.7 Any 为什么要谨慎使用
+
+`Any` 相当于告诉类型检查工具：“这个值可以是任何类型，请不要检查它。”
+
+```python
+from typing import Any
+
+
+def process(data: Any) -> str:
+    return data.not_exist().upper()
+```
+
+上面的代码可能通过类型检查，但运行时仍然会失败。`Any` 可以用于暂时迁移旧代码或类型信息缺失的第三方库边界，但不应为了快速消除错误而到处使用。
+
+优先考虑 `object`、联合类型、`TypedDict`、`Protocol` 或 Pydantic 模型。特别是不要用 `Any` 代替 `str | None` 或外部输入模型。
+
+#### 6.6.8 异步代码中的类型检查
+
+异步函数的返回类型应写成函数实际返回的结果类型，而不是协程类型：
+
+```python
+async def fetch_answer() -> str:
+    return "answer"
+
+
+async def main() -> None:
+    answer = await fetch_answer()
+    print(answer)
+```
+
+如果忘记 `await`，`answer` 是协程对象，不是 `str`：
+
+```python
+async def main() -> None:
+    answer = fetch_answer()
+    print(answer.upper())
+```
+
+Pyright 通常会提示这里的类型不匹配。异步客户端、Protocol 和依赖注入组合使用时，类型检查尤其有价值。
+
+#### 6.6.9 阶段 0 的实践方式
+
+建议在项目根目录执行：
+
+```bash
+pyright
+pytest
+```
+
+每次新增一个模块时：
+
+1. 先给公共函数和类方法添加参数、返回值类型。
+2. 运行 `pyright`，修复真实类型错误。
+3. 用 Pydantic 校验外部输入。
+4. 用 pytest 验证正常场景和异常场景。
+5. 只有确认类型信息不准确时，才使用 `# pyright: ignore[错误编号]`，并留下原因。
+
+不要把类型检查当成一次性任务。它更像编译器反馈：在代码变大之前，尽早发现接口之间的不一致。
 
 建议逐步提高代码质量：
 
@@ -466,11 +1316,293 @@ class User:
         return name.strip().lower()
 ```
 
+这三种方法的核心区别在于：它们绑定的对象不同。
+
+| 方法类型 | 第一个参数 | 能否访问实例属性 | 能否访问类属性 | 是否需要创建实例 | 典型用途 |
+|---|---|---|---|---|---|
+| 实例方法 | `self` | 可以 | 可以 | 通常需要 | 操作某个对象的具体状态 |
+| 类方法 | `cls` | 不能直接访问某个实例 | 可以 | 不需要 | 替代构造器、操作类级别配置 |
+| 静态方法 | 没有隐式参数 | 不能直接访问 | 不能直接访问 | 不需要 | 与类主题相关的独立工具函数 |
+
+### 7.3.1 实例方法：操作具体对象
+
+实例方法的第一个参数通常命名为 `self`，表示当前对象。调用时 Python 会自动传入它：
+
+```python
+user = User("Alice")
+user.display_name()
+```
+
+这大致等价于：
+
+```python
+User.display_name(user)
+```
+
+因此，实例方法可以读取和修改 `self` 上的属性：
+
+```python
+class Task:
+    def __init__(self, title: str) -> None:
+        self.title = title
+        self.completed = False
+
+    def complete(self) -> None:
+        self.completed = True
+
+    def summary(self) -> str:
+        state = "已完成" if self.completed else "未完成"
+        return f"{self.title}: {state}"
+```
+
+```python
+task = Task("学习 FastAPI")
+task.complete()
+print(task.summary())
+```
+
+如果一个方法需要知道“是哪一个用户、任务或客户端正在执行操作”，它通常应该是实例方法。
+
+### 7.3.2 类方法：操作类或创建实例
+
+类方法使用 `@classmethod` 装饰器，第一个参数通常命名为 `cls`，表示当前类：
+
+```python
+class User:
+    def __init__(self, name: str) -> None:
+        self.name = name
+
+    @classmethod
+    def anonymous(cls) -> "User":
+        return cls("anonymous")
+
+
+user = User.anonymous()
+```
+
+这里不需要先创建 `User` 实例，因为类方法绑定的是类本身。`cls("anonymous")` 会创建当前类的对象。
+
+类方法最常见的用途是提供替代构造方式：
+
+```python
+from datetime import datetime
+
+
+class Task:
+    def __init__(self, title: str, created_at: datetime) -> None:
+        self.title = title
+        self.created_at = created_at
+
+    @classmethod
+    def from_title(cls, title: str) -> "Task":
+        return cls(title=title, created_at=datetime.now())
+
+
+task = Task.from_title("学习 Python")
+```
+
+使用 `cls` 而不是直接写类名，可以让子类继承后仍然创建子类对应的对象。
+
+### 7.3.3 静态方法：放在类里的独立函数
+
+静态方法使用 `@staticmethod`，没有自动传入的 `self` 或 `cls`：
+
+```python
+class User:
+    @staticmethod
+    def normalize_name(name: str) -> str:
+        return name.strip().lower()
+
+
+normalized = User.normalize_name(" Alice ")
+```
+
+它不能直接访问 `self.name` 或类属性，只能使用传入的参数和函数内部变量。如果函数与这个类没有明显关系，直接定义成模块级函数通常更容易复用和测试。
+
+### 7.3.4 三种方法放在一起
+
+```python
+class AgentConfig:
+    default_model = "default-model"
+
+    def __init__(self, model: str, temperature: float) -> None:
+        self.model = model
+        self.temperature = temperature
+
+    def describe(self) -> str:
+        # 实例方法：读取当前配置对象的属性
+        return f"{self.model}, temperature={self.temperature}"
+
+    @classmethod
+    def default(cls) -> "AgentConfig":
+        # 类方法：通过类属性创建一个配置对象
+        return cls(model=cls.default_model, temperature=0.2)
+
+    @staticmethod
+    def valid_temperature(temperature: float) -> bool:
+        # 静态方法：只依赖传入参数
+        return 0 <= temperature <= 2
+```
+
+调用方式：
+
+```python
+config = AgentConfig.default()              # 类方法
+print(config.describe())                    # 实例方法
+print(AgentConfig.valid_temperature(0.7))   # 静态方法
+```
+
+### 7.3.5 选型规则
+
+1. 方法需要访问当前对象的属性吗？使用实例方法。
+2. 方法需要创建当前类的对象，或访问类级别配置吗？使用类方法。
+3. 方法只依赖传入参数，且逻辑明显属于这个类吗？使用静态方法。
+4. 方法与类没有明显关系吗？直接定义成模块级函数。
+
+在 Agent 项目中：
+
+- `AgentService.answer()` 通常是实例方法，因为它要使用模型客户端、配置或会话状态。
+- `LLMClient.from_settings()` 可以是类方法，用配置创建客户端。
+- `PromptUtils.normalize()` 可以是静态方法；如果没有类关联，也可以是普通函数。
+
 常见使用场景：
 
 - 实例方法：需要访问对象状态
 - 类方法：提供替代构造方式
 - 静态方法：逻辑属于类的概念，但不依赖实例或类状态
+
+### 7.3.6 类中下划线命名的方法
+
+类中的函数通常称为方法。方法名称中的下划线有特殊约定，但几种写法的含义不同：
+
+| 写法 | 常见含义 | 是否真正禁止外部访问 |
+|---|---|---|
+| `_method` | 内部方法，表示不建议外部直接调用 | 否，只是约定 |
+| `__method` | 双下划线开头，触发名称改写，用于减少子类命名冲突 | 不是严格私有 |
+| `__method__` | Python 特殊方法，也叫 dunder 方法 | 不应随意自定义 |
+| `method_` | 末尾加下划线，避免与关键字或已有名称冲突 | 否 |
+
+#### 单下划线 `_method`：内部使用约定
+
+单下划线开头的方法表示“这是类的内部实现，不建议外部直接调用”：
+
+```python
+class TaskService:
+    def create_task(self, title: str) -> None:
+        clean_title = self._normalize_title(title)
+        print(f"创建任务: {clean_title}")
+
+    def _normalize_title(self, title: str) -> str:
+        return title.strip()
+```
+
+`_normalize_title` 仍然可以从外部调用：
+
+```python
+service = TaskService()
+service._normalize_title(" 学习 Python ")
+```
+
+Python 没有像 Java `private` 那样由语言强制执行的严格私有方法。单下划线主要是给开发者、IDE 和代码审查者的信号：这个方法属于内部实现，未来可能改变，不应作为稳定公共 API 使用。
+
+#### 双下划线开头 `__method`：名称改写
+
+双下划线开头、但不以双下划线结尾的方法会触发名称改写，也叫名称修饰（name mangling）：
+
+```python
+class Account:
+    def __reset_token(self) -> None:
+        print("重置令牌")
+
+    def reset(self) -> None:
+        self.__reset_token()
+```
+
+Python 会把 `__reset_token` 在类内部改写成类似 `_Account__reset_token` 的名称：
+
+```python
+account = Account()
+account.reset()
+account._Account__reset_token()  # 技术上可以访问，但不应该这样调用
+```
+
+它的主要用途不是实现绝对私有，而是避免子类中同名方法意外覆盖父类内部方法：
+
+```python
+class BaseAgent:
+    def __build_context(self) -> str:
+        return "基础上下文"
+
+    def run(self) -> str:
+        return self.__build_context()
+
+
+class CustomAgent(BaseAgent):
+    def __build_context(self) -> str:
+        return "自定义上下文"
+
+
+agent = CustomAgent()
+print(agent.run())  # 仍然使用 BaseAgent 的内部方法
+```
+
+因为父类和子类的方法最终会被改写成不同名称，所以子类的 `__build_context` 不会意外覆盖父类的方法。这个机制也意味着，双下划线方法不适合用来表达“希望子类重写”的扩展点；这种场景应使用单下划线方法或普通方法。
+
+#### 前后双下划线 `__method__`：特殊方法
+
+前后都有双下划线的方法称为特殊方法，通常也叫 dunder 方法（double underscore 的简称）。它们由 Python 在特定语法或内置函数中自动调用：
+
+```python
+class Task:
+    def __init__(self, title: str) -> None:
+        self.title = title
+
+    def __str__(self) -> str:
+        return f"Task(title={self.title!r})"
+
+
+task = Task("学习 asyncio")
+print(task)  # print 会自动调用 task.__str__()
+```
+
+常见特殊方法：
+
+| 方法 | 触发方式 | 作用 |
+|---|---|---|
+| `__init__` | `Class(...)` 创建对象后 | 初始化实例属性 |
+| `__str__` | `str(obj)` 或 `print(obj)` | 提供面向用户的字符串表示 |
+| `__repr__` | `repr(obj)` | 提供面向开发者的详细表示 |
+| `__len__` | `len(obj)` | 定义对象长度 |
+| `__eq__` | `obj1 == obj2` | 定义相等比较 |
+| `__enter__` / `__exit__` | `with obj` | 支持上下文管理器 |
+| `__aenter__` / `__aexit__` | `async with obj` | 支持异步上下文管理器 |
+| `__call__` | `obj(...)` | 让对象可以像函数一样调用 |
+
+特殊方法一般由 Python 的语法或内置函数触发，不建议直接手动调用，也不要随意创造类似 `__my_method__` 的名称，因为这可能与 Python 或第三方库未来的约定冲突。
+
+#### 末尾单下划线 `method_`
+
+如果想使用的名称与 Python 关键字冲突，可以在末尾加一个下划线：
+
+```python
+class Request:
+    def __init__(self, class_: str, from_: str) -> None:
+        self.class_ = class_
+        self.from_ = from_
+```
+
+这里使用 `class_` 和 `from_`，是为了避开 `class` 和 `from` 关键字。末尾下划线没有私有含义。
+
+可以这样记忆：
+
+```text
+_name       -> 内部实现约定
+__name      -> 名称改写，减少继承冲突
+__name__    -> Python 特殊方法
+name_       -> 避免关键字或命名冲突
+```
+
+在 Agent 项目中，普通业务方法通常使用清晰的公开名称；内部辅助逻辑使用 `_`；需要初始化、字符串表示或异步资源管理时，才实现对应的特殊方法。
 
 ### 7.4 继承和组合
 
@@ -668,23 +1800,176 @@ asyncio.run(main())
 
 ### 9.3 不要混淆协程和任务
 
-协程：描述一段可以异步执行的工作。
+协程和任务可以这样理解：
 
-任务：交给事件循环调度的协程。
+```text
+协程函数：做某件事的函数定义
+协程对象：调用协程函数后得到的“待执行工作”
+任务 Task：把待执行工作交给事件循环，让它负责调度和跟踪
+```
+
+可以用“做饭”来类比：
+
+- 协程函数像菜谱，描述如何做菜。
+- 协程对象像已经准备好的订单，但还没有交给厨房执行。
+- 任务像厨房已经接单的订单，厨房（事件循环）会安排它执行，并记录它是否完成、失败或被取消。
+
+协程函数的调用不会立即执行函数体：
 
 ```python
+async def fetch_data() -> str:
+    print("开始请求")
+    await asyncio.sleep(1)
+    print("请求完成")
+    return "data"
+
+
+coroutine = fetch_data()
+print(coroutine)  # 协程对象
+```
+
+上面的代码只创建了协程对象，不会打印“开始请求”。需要 `await` 它，或者把它包装成 Task：
+
+```python
+import asyncio
+
+
+async def main() -> None:
+    coroutine = fetch_data()
+    result = await coroutine  # await 会执行它并等待结果
+    print(result)
+
+
+asyncio.run(main())
+```
+
+### 9.3.1 什么是 Task
+
+`Task` 是 asyncio 用来管理协程执行的对象。使用 `asyncio.create_task()` 后，协程会被安排给当前事件循环：
+
+```python
+import asyncio
+
+
 async def main() -> None:
     task = asyncio.create_task(fetch_data())
-    result = await task
+    print("任务已经提交")
+
+    result = await task  # 等待任务完成，并取得返回值
     print(result)
 ```
 
-如果直接连续 `await`，任务仍然是顺序执行：
+`create_task()` 的重点是“先提交、后等待”。提交任务后，当前协程可以继续做其他事情；当遇到 `await` 或其他让出执行权的地方，事件循环就有机会运行这个 Task。
+
+例如，下面两个任务可以交替执行：
+
+```python
+async def main() -> None:
+    data_task = asyncio.create_task(fetch_data())
+    profile_task = asyncio.create_task(load_user_profile())
+
+    # 两个任务已经提交，下面分别等待它们的结果
+    data = await data_task
+    profile = await profile_task
+    print(data, profile)
+```
+
+如果两个操作互不依赖，也可以用 `asyncio.gather` 表达这种并发关系。不要为了并发而创建 Task；只有在需要让一个工作与当前流程同时推进、稍后再取得结果时，Task 才有意义。
+
+如果直接连续 `await`，操作仍然是顺序执行：
 
 ```python
 first = await fetch_first()
 second = await fetch_second()
 ```
+
+执行过程是：先完整执行 `fetch_first()`，它返回后才开始 `fetch_second()`。如果两个操作互不依赖，可以改成：
+
+```python
+async def main() -> None:
+    first_task = asyncio.create_task(fetch_first())
+    second_task = asyncio.create_task(fetch_second())
+
+    first, second = await first_task, await second_task
+    print(first, second)
+```
+
+### 9.3.2 Task 的结果、异常和状态
+
+任务完成后，可以使用 `result()` 取得结果：
+
+```python
+task = asyncio.create_task(fetch_data())
+await task
+print(task.result())
+```
+
+但 `result()` 只能用于已经完成的任务。如果任务还没完成就调用，可能会抛出 `InvalidStateError`。更常见、更安全的写法是直接 `await task`。
+
+如果任务内部抛出异常，异常会在 `await task` 时重新抛出：
+
+```python
+try:
+    result = await task
+except RuntimeError as error:
+    print(f"任务失败: {error}")
+```
+
+Task 常见状态可以概括为：
+
+```text
+等待调度 -> 执行中 -> 已完成
+                    -> 失败
+                    -> 已取消
+```
+
+可以使用这些方法观察状态：
+
+```python
+task.done()       # 是否已经结束
+task.cancelled()  # 是否被取消
+task.exception()  # 已结束时取得异常
+```
+
+### 9.3.3 取消 Task
+
+不再需要任务时，可以取消它：
+
+```python
+async def main() -> None:
+    task = asyncio.create_task(fetch_data())
+    task.cancel()
+
+    try:
+        await task
+    except asyncio.CancelledError:
+        print("任务已取消")
+```
+
+任务内部如果需要清理资源，应捕获取消异常、完成清理后继续抛出：
+
+```python
+async def fetch_with_cleanup() -> str:
+    try:
+        return await fetch_data()
+    except asyncio.CancelledError:
+        print("释放请求资源")
+        raise
+```
+
+不要把取消当成普通业务失败，也不要捕获 `CancelledError` 后静默吞掉，否则上层可能误以为任务正常完成。
+
+### 9.3.4 协程、Task 和 Future 的关系
+
+阶段 0 可以先记住下面的关系：
+
+```text
+协程：描述异步工作
+Task：调度并跟踪一个协程
+Future：表示未来某个时间可取得的结果
+```
+
+Task 是 Future 的一种具体实现，因此 Task 可以等待、取得结果、检查完成状态和取消。日常业务代码优先使用协程、`create_task`、`gather` 和 `TaskGroup`，通常不需要手动创建 Future。
 
 ### 9.4 并发执行
 
@@ -804,7 +2089,18 @@ async def fetch_all(items: list[str]) -> list[str]:
 
 ### 9.9 异步代码中不要阻塞事件循环
 
-下面的代码会阻塞事件循环：
+#### 9.9.1 事件循环为什么会被阻塞
+
+事件循环可以理解为一个不断运行的调度器：它在某个协程等待 I/O 时，切换去运行其他协程。协程只有在执行 `await` 并把控制权交还给事件循环时，其他任务才有机会运行。
+
+```text
+协程 A 执行一小段代码
+    -> await 等待网络
+    -> 事件循环运行协程 B
+    -> B 等待时再运行其他任务
+```
+
+如果某个协程执行了同步阻塞函数，事件循环所在的线程就会被占住，其他任务也无法运行：
 
 ```python
 import time
@@ -814,7 +2110,32 @@ async def bad_function() -> None:
     time.sleep(3)
 ```
 
-异步函数中应使用异步版本：
+在 `bad_function()` 执行 `time.sleep(3)` 的 3 秒内，当前事件循环线程无法处理其他请求。对于 FastAPI 服务，这可能表现为：
+
+- 一个慢请求导致其他请求也变慢。
+- 心跳、超时和取消处理无法及时执行。
+- Agent 的多个工具调用不能真正并发。
+- 服务吞吐量下降，延迟突然升高。
+
+#### 9.9.2 `await` 不等于一定不会阻塞
+
+`await` 只有在等待的对象本身是异步、并且会适时交还控制权时，才不会阻塞事件循环：
+
+```python
+async def good_sleep() -> None:
+    await asyncio.sleep(3)
+```
+
+下面的写法虽然包含 `await`，但仍可能阻塞，因为 `blocking_function()` 会在返回结果前同步执行：
+
+```python
+async def still_blocking() -> str:
+    return await blocking_function()
+```
+
+如果 `blocking_function()` 是普通同步函数，上面的代码本身通常还会因为不能直接 `await` 而报错；如果同步库返回了可等待包装对象，也不能因此假设内部同步工作不会阻塞。判断标准不是“代码中有没有 `await`”，而是“耗时工作是否把控制权交还给事件循环”。
+
+异步函数中应使用真正的异步版本：
 
 ```python
 import asyncio
@@ -824,7 +2145,18 @@ async def good_function() -> None:
     await asyncio.sleep(3)
 ```
 
-如果必须调用没有异步版本的阻塞函数，可以放到线程中：
+对应关系示例：
+
+| 阻塞写法 | 异步替代 |
+|---|---|
+| `time.sleep()` | `await asyncio.sleep()` |
+| `requests.get()` | `await httpx.AsyncClient().get()` |
+| 同步数据库驱动 | 异步数据库驱动 |
+| 同步文件或 SDK 调用 | `asyncio.to_thread()`，或使用异步 SDK |
+
+#### 9.9.3 没有异步版本时使用线程
+
+如果必须调用没有异步版本的阻塞函数，可以使用 `asyncio.to_thread()` 把它放到线程中：
 
 ```python
 import asyncio
@@ -839,13 +2171,91 @@ async def read_file() -> str:
     return await asyncio.to_thread(blocking_read)
 ```
 
-还要注意这些常见阻塞来源：
+`to_thread()` 的作用是让事件循环线程不执行这段同步代码，而是在线程中执行并异步等待结果。它适合：
+
+- 同步文件读写
+- 同步 SDK 调用
+- 轻量的阻塞 I/O
+- 没有异步版本的客户端库
+
+它不是万能方案：线程仍然消耗系统资源，也不能解决大量 CPU 计算。还要注意同步函数中的线程安全问题。
+
+#### 9.9.4 CPU 密集任务使用进程或专用任务队列
+
+`to_thread()` 更适合 I/O 阻塞。对于图片处理、复杂解析、加密计算或大规模数据计算等 CPU 密集任务，应考虑进程池或独立任务队列：
+
+```python
+import asyncio
+
+
+def calculate_score(values: list[int]) -> int:
+    return sum(value * value for value in values)
+
+
+async def calculate_in_process(values: list[int]) -> int:
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(
+        None,
+        calculate_score,
+        values,
+    )
+```
+
+在生产系统中，更重的任务通常交给 Celery、RQ、Temporal 或其他任务系统处理，API 只负责创建任务并返回任务 ID。不要让 FastAPI 请求一直等待一个很重的 CPU 计算。
+
+#### 9.9.5 常见阻塞来源
 
 - `time.sleep`
-- 同步 HTTP 客户端
-- 大文件同步处理
+- `requests` 等同步 HTTP 客户端
+- 同步数据库客户端
+- 同步 Redis 客户端
+- 没有异步版本的第三方 SDK
+- 大文件同步读写
+- 大规模 JSON 或文档解析
 - CPU 密集型循环
-- 没有异步驱动的数据库客户端
+- 在异步路由中执行同步 Shell 命令
+
+文件读写是否需要线程，要结合文件大小、访问频率和部署方式判断；不能因为使用了 `async def` 就认为函数内部所有操作自动异步。
+
+#### 9.9.6 FastAPI 中的判断原则
+
+```python
+from fastapi import FastAPI
+
+
+app = FastAPI()
+
+
+@app.get("/bad")
+async def bad_endpoint() -> dict[str, str]:
+    time.sleep(3)  # 会阻塞处理其他请求的事件循环
+    return {"status": "done"}
+
+
+@app.get("/good")
+async def good_endpoint() -> dict[str, str]:
+    await asyncio.sleep(3)
+    return {"status": "done"}
+```
+
+如果必须使用同步函数，FastAPI 也可以处理普通的 `def` 路由，但应理解其执行模型，并避免在异步代码中直接调用阻塞函数。外部网络请求优先使用 HTTPX `AsyncClient`，不要在 `async def` 路由中调用同步 HTTP 客户端。
+
+#### 9.9.7 如何排查事件循环阻塞
+
+可以从以下方向排查：
+
+1. 搜索 `async def` 函数中的 `time.sleep`、`requests` 和同步数据库调用。
+2. 检查异步路由是否调用了同步 Service 或同步 SDK。
+3. 记录请求开始时间、上游调用耗时和总耗时。
+4. 在开发环境开启 asyncio 调试模式：
+
+```bash
+python -X dev main.py
+```
+
+5. 使用日志或性能分析工具找出长时间没有让出控制权的代码。
+
+判断是否存在阻塞的一个简单信号是：某个请求执行本身并不复杂，但同时到来的其他请求也在相同时间明显卡顿。
 
 ### 9.10 asyncio 与 HTTPX
 
