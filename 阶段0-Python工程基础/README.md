@@ -17,6 +17,10 @@
 - [FastAPI 学习文档](FastAPI学习文档.md)
 - [HTTPX 学习文档](HTTPX学习文档.md)
 
+练习代码：
+
+- [阶段 0 Python 工程练习 Notebook](code/阶段0-Python工程练习.ipynb)
+
 后续文档示例：
 
 - FastAPI 学习文档
