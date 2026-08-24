@@ -233,7 +233,19 @@ async def get_task(task_id: int) -> TaskResponse:
 
 ## 七、依赖注入
 
-FastAPI 的依赖注入可以统一提供数据库会话、当前用户、配置和外部客户端。
+依赖注入（Dependency Injection，DI）是把对象需要的协作者从外部传入，而不是在对象内部直接创建。这样路由只负责 HTTP 适配，业务代码不需要知道数据库、认证组件或模型客户端的具体创建方式。
+
+在 Agent 服务中，常见依赖包括：
+
+- 配置对象：API Key、模型名称、超时时间和功能开关
+- 当前用户：解析 JWT、Session 或 API Key，并完成权限检查
+- 数据库会话：保证一次请求内的查询和事务边界
+- 外部客户端：HTTPX、Redis、向量数据库和 LLM 客户端
+- 业务 Service：组合仓储、权限校验和 Agent 编排逻辑
+
+### 7.1 `Depends` 的基本用法
+
+依赖就是一个可调用对象，FastAPI 会在处理请求前调用它，并把返回值传给路由参数。推荐使用 `Annotated` 为依赖声明命名类型：
 
 ```python
 from typing import Annotated
@@ -259,6 +271,210 @@ SettingsDependency = Annotated[Settings, Depends(get_settings)]
 async def get_info(settings: SettingsDependency) -> dict[str, str]:
     return {"app_name": settings.app_name}
 ```
+
+一个依赖也可以依赖另一个依赖，FastAPI 会构建并解析依赖树。例如认证依赖可以复用配置依赖，当前用户依赖再复用认证依赖：
+
+```python
+from typing import Annotated
+
+from fastapi import Depends, HTTPException, status
+
+
+class CurrentUser:
+    def __init__(self, user_id: str, roles: set[str]) -> None:
+        self.user_id = user_id
+        self.roles = roles
+
+
+def get_current_user() -> CurrentUser:
+    token = "从请求 Header 读取的 token"
+    if token != "valid-token":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="未认证",
+        )
+    return CurrentUser(user_id="user-1", roles={"reader"})
+
+
+CurrentUserDependency = Annotated[
+    CurrentUser,
+    Depends(get_current_user),
+]
+
+
+@app.get("/profile")
+async def get_profile(
+    current_user: CurrentUserDependency,
+) -> dict[str, str]:
+    return {"user_id": current_user.user_id}
+```
+
+依赖可以声明在路由参数中，也可以声明在路由、`APIRouter` 或整个应用级别：
+
+```python
+from fastapi import APIRouter, Depends
+
+
+router = APIRouter(
+    prefix="/admin",
+    dependencies=[Depends(require_admin)],
+)
+```
+
+路由参数中的依赖适合需要使用返回值的场景；`dependencies` 适合只需要执行校验、而不需要把结果传给路由的场景。
+
+### 7.2 数据库会话和 `yield`
+
+数据库会话通常需要“创建、使用、关闭”三个步骤，可以用 `yield` 依赖表达资源释放逻辑：
+
+```python
+from collections.abc import Generator
+
+
+def get_db() -> Generator[DatabaseSession, None, None]:
+    session = SessionFactory()
+    try:
+        yield session
+    finally:
+        session.close()
+
+
+DatabaseDependency = Annotated[
+    DatabaseSession,
+    Depends(get_db),
+]
+
+
+@app.get("/tasks")
+async def list_tasks(
+    db: DatabaseDependency,
+) -> list[TaskResponse]:
+    return await task_service.list_tasks(db)
+```
+
+`yield` 之前的代码负责准备资源，`yield` 之后的代码负责清理资源。数据库事务的提交和回滚应由 Service 或专门的事务边界统一管理，不要在每个路由里重复编写。
+
+### 7.3 生命周期依赖与请求依赖的区别
+
+不要把所有客户端都写成普通依赖中的 `Client()`：
+
+- 应用级共享资源：HTTPX 客户端、数据库连接池、Redis 客户端和模型客户端，通常在 `lifespan` 中创建，在应用关闭时释放。
+- 请求级资源：数据库 Session、当前用户、请求上下文，通常使用 `Depends`，每次请求独立创建或解析。
+- 纯计算依赖：分页参数、权限判断和配置读取，可以直接使用普通函数。
+
+依赖注入负责“如何提供给当前请求”，`lifespan` 负责“应用级资源何时创建和销毁”，两者不要混为一谈。大型项目可以让依赖从 `request.app.state` 读取共享客户端：
+
+```python
+from fastapi import Request
+
+
+def get_llm_client(request: Request) -> LLMClient:
+    return request.app.state.llm_client
+```
+
+### 7.4 Service 层也要注入依赖
+
+DI 不应该只停留在路由层。Service 的构造函数也应接收仓储或客户端，这样业务逻辑可以脱离 FastAPI 单独测试：
+
+```python
+class TaskService:
+    def __init__(self, repository: TaskRepository) -> None:
+        self.repository = repository
+
+    async def create(self, request: TaskCreate) -> TaskResponse:
+        task = await self.repository.create(request)
+        return TaskResponse.model_validate(task)
+
+
+def get_task_service(
+    db: DatabaseDependency,
+) -> TaskService:
+    return TaskService(TaskRepository(db))
+
+
+TaskServiceDependency = Annotated[
+    TaskService,
+    Depends(get_task_service),
+]
+
+
+@app.post("/tasks", response_model=TaskResponse)
+async def create_task(
+    request: TaskCreate,
+    service: TaskServiceDependency,
+) -> TaskResponse:
+    return await service.create(request)
+```
+
+对于简单项目，可以直接使用函数依赖；对于依赖配置复杂、需要明确生命周期的组件，可以使用类作为依赖。不要为了“使用 DI”把每个简单函数都包装成类。
+
+### 7.5 测试时替换真实依赖
+
+FastAPI 可以通过 `app.dependency_overrides` 在测试中替换依赖。例如不连接真实数据库，改用 Fake Service：
+
+```python
+from collections.abc import Iterator
+from fastapi.testclient import TestClient
+
+
+def get_fake_task_service() -> Iterator[TaskService]:
+    yield FakeTaskService()
+
+
+app.dependency_overrides[get_task_service] = get_fake_task_service
+
+client = TestClient(app)
+response = client.post(
+    "/tasks",
+    json={"title": "测试任务", "priority": 2},
+)
+
+assert response.status_code == 201
+app.dependency_overrides.clear()
+```
+
+测试中应替换外部边界，而不是替换被测试的业务规则：数据库、LLM、支付、邮件和第三方 HTTP API 可以使用 Fake 或 Mock；Service 内部的权限判断、重试策略和状态转换仍应真实执行。
+
+### 7.6 和 Java Spring 的对比
+
+| 对比项 | FastAPI | Spring Boot |
+|---|---|---|
+| 注入入口 | 函数参数、`Depends`、`Annotated` | 构造器参数、`@Autowired`、`@Bean`、组件扫描 |
+| 依赖解析 | FastAPI 在请求处理时解析依赖树 | Spring 容器启动时创建并装配 Bean，部分作用域按请求解析 |
+| 默认生命周期 | 函数依赖通常按请求缓存一次；可用 `use_cache=False` 关闭 | Bean 默认 Singleton；也有 Prototype、Request、Session 等作用域 |
+| 资源释放 | `yield` 依赖或 `lifespan` | `@PreDestroy`、`DisposableBean`、`try-with-resources` 等 |
+| 请求级对象 | `Depends(get_db)`、当前用户依赖 | `@RequestScope` Bean、过滤器、拦截器或方法参数 |
+| 全局共享客户端 | `app.state` 配合 `lifespan` | Singleton Bean，通常通过 `@Bean` 声明 |
+| 测试替换 | `app.dependency_overrides` | `@MockBean`、测试配置、Profile 或替换 Bean |
+| 认证与横切逻辑 | 依赖、Middleware、Security 工具 | Spring Security、Filter、Interceptor、AOP |
+
+Java 开发者可以这样建立映射：
+
+```text
+FastAPI Depends(get_service)
+  ≈ Spring 构造器注入 TaskService
+
+FastAPI get_db() + yield
+  ≈ Spring 注入请求级事务资源并在作用域结束后释放
+
+FastAPI lifespan + app.state
+  ≈ Spring @Bean(singleton) + 应用生命周期回调
+
+FastAPI dependency_overrides
+  ≈ Spring 测试配置中替换 Bean 或 @MockBean
+```
+
+但两者不是完全相同的容器模型：FastAPI 的依赖主要围绕请求处理函数组织，依赖是显式的函数调用图；Spring 则是完整的 IoC 容器，支持组件扫描、条件装配、多个 Bean 候选、复杂作用域和 AOP。FastAPI 项目通常不需要照搬 Spring 的大量注解和容器配置，优先使用显式函数依赖和构造器注入即可。
+
+### 7.7 使用场景总结
+
+- 认证和权限：解析当前用户，并在路由或 Router 级别复用权限校验。
+- 多租户：从用户或请求头解析 `tenant_id`，让 Service 和仓储自动带上租户过滤条件。
+- 数据库访问：每个请求获得独立 Session，并确保异常时释放资源。
+- LLM 和工具客户端：从应用共享客户端中注入，避免每个请求重复建立连接。
+- 配置切换：开发、测试、生产环境注入不同 Settings 或模型配置。
+- 可测试架构：用 Fake LLM、Fake Repository 替换真实外部服务，稳定验证 Agent 业务逻辑。
+- 统一审计：注入当前用户和请求标识，记录工具调用者、参数摘要和执行结果。
 
 依赖注入的好处：
 
@@ -292,6 +508,123 @@ async def create_task(request: TaskCreate) -> TaskResponse:
     task = await task_service.create(request)
     return task
 ```
+
+### 8.1 `@router.post` 和 `@app.get` 的区别
+
+这两个装饰器都用于注册 HTTP 路由，主要区别在于**路由注册到谁，以及路由是否可以被组合复用**：
+
+| 写法 | 注册对象 | 常见位置 | 适用场景 |
+|---|---|---|---|
+| `@app.get("/answer")` | FastAPI 应用实例 `app` | `main.py` | 健康检查、简单接口、应用级入口 |
+| `@router.post("", response_model=TaskResponse)` | `APIRouter` 实例 `router` | `routers/tasks.py` | 按业务模块拆分路由，配合前缀、标签和通用依赖 |
+
+`app` 是最终运行的应用，Uvicorn 启动的就是它；`router` 是一组待装配的路由，必须通过 `app.include_router()` 注册到应用后才会生效。
+
+直接注册到 `app`：
+
+```python
+app = FastAPI()
+
+
+@app.get("/answer")
+async def answer() -> dict[str, str]:
+        return {"answer": "ok"}
+```
+
+这里的最终请求路径就是 `GET /answer`。`@app.get()` 里的路径通常写完整路径，因为它直接挂在应用上。
+
+使用 `APIRouter` 分层：
+
+```python
+# routers/tasks.py
+from fastapi import APIRouter
+
+
+router = APIRouter(prefix="/tasks", tags=["tasks"])
+
+
+@router.post("", response_model=TaskResponse)
+async def create_task(request: TaskCreate) -> TaskResponse:
+        task = await task_service.create(request)
+        return task
+```
+
+```python
+# main.py
+from fastapi import FastAPI
+
+from app.routers.tasks import router as tasks_router
+
+
+app = FastAPI()
+app.include_router(tasks_router)
+```
+
+此时最终路径是 `POST /tasks`：
+
+```text
+APIRouter(prefix="/tasks") + @router.post("")
+    = /tasks
+```
+
+`@router.post("")` 中的空字符串表示“当前 Router 的根路径”，不是没有路径。也可以写成 `@router.post("/")`，但通常要统一风格，避免不同路由产生尾部斜杠重定向差异。
+
+`include_router` 还可以在装配时增加前缀、标签和通用依赖：
+
+```python
+app.include_router(
+        tasks_router,
+        prefix="/api/v1",
+        tags=["v1-tasks"],
+        dependencies=[Depends(require_login)],
+)
+```
+
+如果 Router 自身已有 `prefix="/tasks"`，上面的最终路径就是 `POST /api/v1/tasks`。最终路径由 Router 前缀、`include_router` 前缀和装饰器路径拼接得到。
+
+### 8.2 为什么业务路由优先使用 `APIRouter`
+
+推荐按业务模块拆分：
+
+```text
+main.py                 -> 创建 app，注册各个 Router
+routers/tasks.py        -> 任务相关接口
+routers/chat.py         -> Agent 对话接口
+routers/admin.py        -> 管理接口和管理员权限
+services/task_service.py -> 任务业务逻辑
+```
+
+这样做的好处是：
+
+- `main.py` 不会堆积所有接口。
+- 每个模块可以独立设置 `prefix`、OpenAPI `tags` 和权限依赖。
+- Router 可以在测试或不同版本 API 中重复装配。
+- 业务路由更容易和 Service、Schema、Client 分离。
+
+`@app.get` 并不是错误写法。小型项目或健康检查使用它很直接；当接口按用户、任务、对话等业务域增长时，应使用 `APIRouter` 管理模块边界。
+
+### 8.3 和 Java Spring MVC 的对比
+
+可以把它们大致对应为：
+
+```text
+FastAPI app
+    ≈ Spring Boot 应用上下文和最终 Web 应用
+
+FastAPI APIRouter
+    ≈ 一个按业务拆分的 @RestController 模块
+
+@app.get("/answer")
+    ≈ @GetMapping("/answer") 直接声明完整接口路径
+
+APIRouter(prefix="/tasks") + @router.post("")
+    ≈ @RequestMapping("/tasks") + @PostMapping
+
+app.include_router(router, prefix="/api/v1")
+    ≈ 在 Controller 类或统一 Web 配置上增加 /api/v1 前缀
+```
+
+但 `APIRouter` 不是 Spring 的 IoC 容器，也不是一个独立运行的应用。它主要负责路由分组和装配；Service、数据库和 LLM 客户端仍应通过依赖注入提供给接口。
 
 推荐项目结构：
 
