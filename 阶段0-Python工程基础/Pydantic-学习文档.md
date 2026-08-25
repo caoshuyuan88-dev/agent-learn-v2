@@ -394,6 +394,133 @@ Pydantic v2 中优先使用：
 
 ## 十、模型配置
 
+### 10.0 `model_config` 是什么
+
+`model_config` 是 Pydantic v2 中用于配置模型行为的类属性。它决定模型如何处理额外字段、是否进行类型转换、是否去除字符串首尾空白，以及如何生成 JSON Schema。
+
+基本写法是：
+
+```python
+from pydantic import BaseModel, ConfigDict
+
+
+class UserInput(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+    username: str
+```
+
+这里的 `model_config` 不是业务数据字段，而是 Pydantic 的模型级配置。输入数据中不会出现名为 `model_config` 的接口字段；它只影响 Pydantic 如何校验和处理模型数据。
+
+可以把它理解为“这个模型的校验规则开关”：
+
+```text
+字段类型和 Field
+  -> 规定字段本身允许什么值
+
+model_config
+  -> 规定整个模型如何处理输入数据
+```
+
+例如：
+
+```python
+class UserInput(BaseModel):
+    model_config = ConfigDict(str_strip_whitespace=True)
+
+    username: str
+
+
+user = UserInput(username="  alice  ")
+print(user.username)
+# alice
+```
+
+`str_strip_whitespace=True` 会自动执行字符串的 `strip()` 效果，只处理首尾空白，不会删除中间空格，也不会把空字符串自动变成 `None`。如果还要求字符串不能为空，需要继续使用 `Field(min_length=1)`。
+
+### 10.0.1 常用配置项
+
+| 配置项 | 作用 | 常见使用场景 |
+|---|---|---|
+| `extra="ignore"` | 忽略未声明字段，通常是默认行为 | 兼容字段可能变化的外部数据 |
+| `extra="forbid"` | 未声明字段直接校验失败 | 工具参数、权限数据、严格 API 契约 |
+| `extra="allow"` | 保留未声明字段 | 确实需要扩展字段的输入模型 |
+| `strict=True` | 尽量禁止隐式类型转换 | 金额、权限、工具参数等敏感数据 |
+| `str_strip_whitespace=True` | 去除字符串首尾空白 | 用户名、标题、搜索关键词 |
+| `str_min_length` | 为字符串设置统一最小长度 | 模型中所有字符串都有最低长度时 |
+| `str_max_length` | 为字符串设置统一最大长度 | 统一限制文本输入规模 |
+| `validate_assignment=True` | 修改模型属性时再次校验 | 需要保证对象在运行过程中始终有效 |
+| `frozen=True` | 禁止修改模型字段 | 配置对象、不可变值对象 |
+| `from_attributes=True` | 允许从对象属性读取数据 | 从 ORM 对象生成响应模型 |
+
+### 10.0.2 `model_config` 和 `Field` 的区别
+
+`Field` 更适合配置某一个字段，`model_config` 更适合配置整个模型：
+
+```python
+class TaskCreate(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+    title: str = Field(min_length=1, max_length=200)
+    priority: int = Field(ge=1, le=5)
+```
+
+两者分别负责：
+
+- `Field`：`title` 不能为空、最多 200 个字符；`priority` 必须在 1 到 5 之间。
+- `model_config`：所有字符串去除首尾空白，并禁止输入未声明的字段。
+
+如果只写 `str_strip_whitespace=True`，输入全是空格的标题会变成空字符串，但不一定失败；因此通常要和 `Field(min_length=1)` 组合使用。
+
+### 10.0.3 配置的作用范围和继承
+
+配置通常只影响当前模型，也可以通过继承复用：
+
+```python
+class StrictModel(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        str_strip_whitespace=True,
+    )
+
+
+class ToolArguments(StrictModel):
+    user_id: int
+    action: str
+```
+
+`ToolArguments` 会继承 `StrictModel` 的配置。子模型也可以重新声明 `model_config` 覆盖或补充配置。嵌套模型是否采用相同配置，要看嵌套模型自己的定义，不能假设外层配置会自动改变所有内部模型。
+
+### 10.0.4 与 Java 的对比
+
+`model_config` 没有一个完全等价的 Java 注解，更接近“模型类上的统一配置 + Jackson 反序列化配置”的组合：
+
+```text
+Pydantic model_config
+  ≈ Jackson ObjectMapper 配置
+  + DTO 上的反序列化注解
+  + Bean Validation 的统一约束策略
+```
+
+例如：
+
+| Pydantic | Java 常见对应思路 |
+|---|---|
+| `extra="forbid"` | Jackson 禁止未知字段，或 DTO 严格反序列化配置 |
+| `strict=True` | 禁止 Jackson 宽松类型转换，并配合严格校验 |
+| `str_strip_whitespace=True` | 自定义反序列化器或统一字符串清洗器 |
+| `Field(min_length=1)` | `@Size(min = 1)`、`@NotBlank` |
+| `Field(ge=1, le=5)` | `@Min(1)` 和 `@Max(5)` |
+| `from_attributes=True` | 从 ORM 实体映射到 DTO |
+
+区别在于：Pydantic 把类型、字段约束和部分模型行为集中写在 Python 模型中；Java 通常由 DTO、Jackson 和 Bean Validation 多个机制共同完成。
+
 ### 10.1 禁止额外字段
 
 默认情况下，模型可能忽略输入中的额外字段。对于安全敏感或接口边界，通常建议明确配置：

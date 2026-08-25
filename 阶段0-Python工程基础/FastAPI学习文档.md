@@ -365,6 +365,159 @@ async def list_tasks(
 依赖注入负责“如何提供给当前请求”，`lifespan` 负责“应用级资源何时创建和销毁”，两者不要混为一谈。大型项目可以让依赖从 `request.app.state` 读取共享客户端：
 
 ```python
+from contextlib import asynccontextmanager
+
+import httpx
+from fastapi import FastAPI, Request
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    app.state.http_client = httpx.AsyncClient(timeout=10.0)
+    yield
+    await app.state.http_client.aclose()
+
+
+app = FastAPI(lifespan=lifespan)
+
+
+def get_http_client(request: Request) -> httpx.AsyncClient:
+    return request.app.state.http_client
+```
+
+执行顺序是：
+
+```text
+启动应用进程
+  -> 执行 yield 之前的代码
+  -> 创建共享 HTTP 客户端
+  -> lifespan 暂停在 yield
+  -> 开始接收 HTTP 请求
+  -> 请求依赖从 app.state 取出客户端
+  -> 路由使用客户端发送请求
+  -> 应用停止，不再接收新请求
+  -> 执行 yield 之后的代码
+  -> 关闭 HTTP 客户端
+```
+
+`yield` 是启动阶段和关闭阶段的分界线：
+
+- `yield` 之前：初始化资源。初始化失败时，应用通常不会开始接收请求。
+- `yield`：应用处于运行状态，可以处理请求。
+- `yield` 之后：释放资源。这里应关闭连接池、客户端和后台任务。
+
+### 7.3.1 `lifespan` 适合管理什么
+
+适合放在 `lifespan` 中的资源，特点是创建成本较高、可以被多个请求共享，并且需要明确关闭：
+
+- HTTPX `AsyncClient`
+- 数据库连接池，而不是某一次请求的数据库 Session
+- Redis 客户端
+- 向量数据库客户端
+- LLM SDK 客户端
+- 需要启动和停止的后台任务
+
+不适合放在其中的对象包括当前用户、请求参数和一次请求专用的数据库 Session。它们与单次请求有关，应通过 `Depends` 创建或解析。
+
+### 7.3.2 `lifespan` 和请求依赖的配合
+
+两者通常是“共享客户端 + 请求级使用”的关系：
+
+```python
+from typing import Annotated
+
+from fastapi import Depends
+
+
+HttpClientDependency = Annotated[
+    httpx.AsyncClient,
+    Depends(get_http_client),
+]
+
+
+@app.get("/remote-status")
+async def remote_status(
+    client: HttpClientDependency,
+) -> dict[str, int]:
+    response = await client.get("https://example.com/health")
+    return {"status_code": response.status_code}
+```
+
+这里每个请求都会执行 `get_http_client()`，但它返回的是 `lifespan` 创建的同一个共享客户端。请求结束时不会关闭客户端，客户端由应用关闭时的 `lifespan` 统一关闭。
+
+不要这样写：
+
+```python
+def get_http_client() -> httpx.AsyncClient:
+    return httpx.AsyncClient()
+```
+
+这会导致每个请求都创建一个新的客户端，连接池无法复用，还可能因为没有正确关闭而造成连接泄漏。
+
+### 7.3.3 与 `yield` 请求依赖的区别
+
+两种 `yield` 的作用域不同：
+
+```text
+lifespan 中的 yield
+  -> 应用启动一次，应用关闭一次
+  -> 管理跨请求共享资源
+
+Depends(get_db) 中的 yield
+  -> 通常每个请求执行一次
+  -> 管理当前请求使用的资源
+```
+
+可以用数据库举例：
+
+```text
+lifespan：创建数据库连接池
+  -> get_db：从连接池获取一个 Session
+  -> 路由和 Service 使用 Session
+  -> get_db 的 finally：归还或关闭 Session
+  -> 应用关闭时 lifespan：关闭连接池
+```
+
+因此，连接池不应为每次请求重复创建；同样，也不应把同一个数据库 Session 在多个并发请求之间共享。
+
+### 7.3.4 多进程部署时的注意事项
+
+`lifespan` 通常是**每个应用进程执行一次**，不是整个服务器集群只执行一次。例如使用 4 个 Uvicorn worker 时，通常会创建 4 个 HTTP 客户端、4 个连接池或 4 组后台任务。
+
+因此：
+
+- 共享资源数量要按 worker 数量评估。
+- 不能依赖 `lifespan` 中的内存变量实现跨进程共享状态。
+- 定时任务要避免每个 worker 重复执行，必要时使用独立任务服务或分布式锁。
+- 数据库连接池大小应结合 worker 数量和数据库最大连接数配置。
+
+### 7.3.5 测试 `lifespan`
+
+使用 `TestClient` 时，推荐使用上下文管理器，确保启动和关闭逻辑会执行：
+
+```python
+from fastapi.testclient import TestClient
+
+
+with TestClient(app) as client:
+    response = client.get("/remote-status")
+    assert response.status_code == 200
+```
+
+如果直接创建 `TestClient(app)` 而不使用 `with`，某些版本和场景下不会执行完整的 lifespan 生命周期。测试中也可以替换 `get_http_client` 依赖，避免访问真实外部服务。
+
+```python
+app.dependency_overrides[get_http_client] = get_fake_http_client
+try:
+    with TestClient(app) as client:
+        response = client.get("/remote-status")
+finally:
+    app.dependency_overrides.clear()
+```
+
+原来的依赖函数仍然可以这样理解：
+
+```python
 from fastapi import Request
 
 
