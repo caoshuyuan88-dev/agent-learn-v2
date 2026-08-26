@@ -10,3 +10,10 @@
 - Hybrid Search、Rerank 和 Query Rewrite
 - 引用来源、权限控制和多租户
 - RAG 召回率、准确率和幻觉评测
+
+## 开发环境准备：Docker 安装 PostgreSQL + PGVector
+
+本阶段使用 PostgreSQL 保存业务数据，并使用 PGVector 保存文档向量。ECS 已安装 Docker 的情况下，可以直接使用 Docker Compose 启动数据库。
+
+
+-[项目代码](https://github.com/caoshuyuan88-dev/hello-rag-langchain.git)
