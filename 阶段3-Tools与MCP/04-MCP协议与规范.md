@@ -116,64 +116,221 @@ Host 只关心「我有哪些 Client」，每个 Client 只关心「我对应的
 | **Resources** | 可读取的数据 / 上下文 | 应用读取后注入上下文 | `resources/list`、`resources/read` | Repository / 数据源 |
 | **Prompts** | 可复用的提示模板 | 应用 / 用户选择 | `prompts/list`、`prompts/get` | 模板引擎 / 预制 Prompt 库 |
 
-记忆口诀：**Tool 让模型「做事」，Resource 让应用「喂数据」，Prompt 让用户「选模板」。**
+记忆口诀：**Tool 让模型「做事」，Resource 让应用「喂数据」，Prompt 让用户「选模板」。** 更直白一点：Tool 是模型能调的「函数」，Resource 是应用塞给模型的「数据」，Prompt 是用户点选的「模板」。
+
+三个原语最本质的区别是**谁发起**：
+
+```text
+Tool     -> 模型发起（对话中自主选择）-> 应用批准 -> 执行 -> 结果回模型
+Resource -> 应用发起（代码主动读取）  -> 内容注入上下文 -> 模型「读到」
+Prompt   -> 用户/应用发起（点选模板） -> 渲染成消息序列 -> 作为初始指令喂模型
+```
+
+下面各节用 FastMCP（server 侧）和 `ClientSession`（client 侧）给出最小代码，帮助建立直觉（完整实践见 05、06 文档）。
 
 ### 3.2 Tools：让模型「做事」
 
-Tools 是三个原语里最重要、最常用的，它对应你已学过的 Tool Calling。
+Tools 对应你已学过的 Tool Calling，是三个原语里最重要、最常用的。**它是唯一由「模型发起」的原语**：对话中模型自己判断「该查订单了」，于是选中这个工具、填好参数；应用批准后执行；结果返回给模型继续推理。
 
-- `tools/list`：Server 返回工具清单，每个工具含 `name`、`description`、`inputSchema`（JSON Schema 描述参数）。
-- `tools/call`：Client 携带 `name` 和 `arguments` 调用工具；Server 返回结果（`content`，可以是文本、图片、资源引用等）和 `isError` 标志。
-- **模型只负责「选择工具 + 填参数」，执行必须经过用户或应用批准**——尤其写入类工具。这与你阶段 3 前几篇学的 RBAC、人工确认一脉相承，MCP 协议把「批准」作为调用链路里的一个显式环节。
+Server 侧（FastMCP 定义一个工具，详见 05 文档）：
 
-`tools/list` 响应示意（简化）：
+```python
+from mcp.server.fastmcp import FastMCP
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "result": {
-    "tools": [
-      {
-        "name": "query_order",
-        "description": "按订单号查询订单状态，只读操作",
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "order_id": { "type": "string", "description": "订单号" }
-          },
-          "required": ["order_id"]
-        }
-      }
-    ]
-  }
-}
+mcp = FastMCP("ops-server")
+
+
+@mcp.tool()
+def query_order(order_id: str) -> dict:
+    """按订单号查询订单状态，只读操作。"""
+    return {"order_id": order_id, "status": "已发货", "eta": "2025-12-20"}
+```
+
+Client 侧（你的 Agent 服务里，详见 06 文档）：
+
+```python
+tools = await session.list_tools()
+# tools.tools[0] -> name="query_order"
+#                   description="按订单号查询订单状态，只读操作"
+#                   inputSchema={"order_id": {"type": "string"}}
+
+result = await session.call_tool("query_order", {"order_id": "ORD-00001234"})
+# result.content -> [TextContent(text='{"order_id": ..., "status": "已发货"}')]
+# result.isError -> False（False = 业务成功）
+```
+
+完整链路（对照阶段 1 的 Tool Calling）：
+
+```text
+用户："订单 ORD-00001234 到哪了？"
+ 1. 模型从工具清单里选中 query_order，填好参数 order_id     <- 模型发起
+ 2. 应用（Host）批准后，Client 发 tools/call 给 Server
+ 3. Server 执行查库，返回结果和 isError                      <- 真正执行
+ 4. 结果作为 ToolMessage 回给模型
+ 5. 模型基于真实数据组织最终答案
 ```
 
 Java 类比：`tools/call` 像一次 RPC 调用；`inputSchema` 像 OpenAPI 的请求参数定义（或 `@RequestParam` 加校验注解）；「需要批准」像 `@PreAuthorize` 或银行转账的二次确认。
 
+关键认知：**模型只是「提议」，真正执行的是 Server（运行在你的进程/权限下）**——所以写入类工具必须有批准与权限机制，和阶段 3 前几篇的 RBAC、人工确认一脉相承。
+
 ### 3.3 Resources：让应用「喂数据」
 
-Resources 解决「模型如何获得上下文数据」的问题——但它不是让模型去调用，而是**由应用读取后把内容注入对话上下文**（类似 RAG 的检索注入）。
+Resources 解决「模型如何获得上下文数据」。**它不是让模型去调用**——模型在 MCP 里没有「读取资源」这个动作；而是**由应用代码主动读取，把内容注入对话上下文**（类似 RAG 的检索注入，但把「读取」这个动作协议化了）。
 
-- `resources/list`：Server 列出可用资源（名称、描述、URI、MIME 类型）。
-- `resources/read`：按 URI 读取资源内容。
-- URI 是资源的定位方式，scheme 可以自定义：`file:///var/log/app.log`（本地文件）、`logs:///prod/app`（日志）、`db:///orders/recent`（数据库查询结果）、`https://...`（网页）等。scheme 只是一个约定，具体语义由 Server 实现决定——就像 URL 的 scheme 由协议决定。
-- 订阅可选：Client 可 `resources/subscribe`，资源变化时 Server 发 `notifications/resources/updated` 通知。
+Server 侧（FastMCP 定义一个资源）：
+
+```python
+@mcp.resource("db://tables")
+def list_tables() -> str:
+    """返回当前可查询的表清单。"""
+    return "可用表：orders(订单)、inventory(库存)、users(用户)"
+
+
+@mcp.resource("db://orders/{order_id}")   # URI 支持路径参数
+def order_detail(order_id: str) -> str:
+    return f"订单 {order_id}：金额 299.00 元，状态 已发货"
+```
+
+Client 侧（应用代码主动读取，而不是模型）：
+
+```python
+# 应用启动时读一次表清单，拼进 system prompt
+res = await session.read_resource("db://tables")
+tables_text = res.contents[0].text
+
+messages = [
+    {"role": "system", "content": f"你是运维分析助手。可查询的数据表：\n{tables_text}"},
+    {"role": "user", "content": "订单表里都有哪些状态？"},
+]
+```
+
+区别立刻可见：**模型从头到尾没调用过任何 resource**，它只是「读到了」应用塞进上下文的文本。URI 的 scheme 可以自定义（`file://`、`logs://`、`db://`、`https://` 等），具体语义由 Server 实现决定，就像 URL 的 scheme 由协议决定。订阅（`resources/subscribe`）可选：资源变化时 Server 发通知，应用可刷新上下文。
 
 Java 类比：Resources 相当于 Repository / DAO 层——模型看不到数据访问代码，只看到应用注入好的内容；URI 就是数据源的定位符。**注意区分**：RAG 里的检索结果是应用代码注入的，Resources 则是把「检索/读取」这个动作协议化了，让不同 Server 用统一方式暴露数据。
 
 ### 3.4 Prompts：让用户「选模板」
 
-Prompts 是可复用、参数化的提示模板，**由应用或用户主动选择使用**（类似点击一个快捷指令），而不是模型自动调用。
+Prompts 是可复用、参数化的提示模板。**由用户或应用主动选择**（类似点击一个「快捷指令」按钮），模型不会自动调用它。`prompts/get` 返回的是**渲染后的完整消息序列**（可含多条 system/user 消息），直接作为对话的起始指令。
 
-- `prompts/list`：列出 Server 提供的模板（名称、描述、参数定义）。
-- `prompts/get`：传入参数（arguments），返回渲染后的完整消息序列（可包含多条 system/user 消息）。
-- 典型用途：固定格式的报告生成、多步引导的排查流程、标准化的 SQL 生成前缀。
+Server 侧（FastMCP 定义一个提示模板）：
 
-Java 类比：像 Thymeleaf / FreeMarker 模板，或项目里沉淀的 prompt 常量库；`prompts/get` 就是「模板 + 参数 → 渲染结果」。与 Tool 的区别：Tool 的结果进入模型后模型继续推理；Prompt 的结果是**喂给模型的初始指令**，执行权在应用侧。
+```python
+from mcp.server.fastmcp.prompts import SystemMessage, UserMessage
 
-### 3.5 如何选择：一张决策表
+
+@mcp.prompt("order-analysis")
+def order_analysis(order_id: str):
+    """按固定格式分析一个订单。"""
+    return [
+        SystemMessage("你是订单分析专家。输出必须包含：订单号、状态、风险、建议。"),
+        UserMessage(f"请分析订单 {order_id}"),
+    ]
+```
+
+Client 侧（用户点按钮 / 应用主动选择模板）：
+
+```python
+prompt = await session.get_prompt("order-analysis", {"order_id": "ORD-00001234"})
+# prompt.messages -> [SystemMessage("你是订单分析专家…"), UserMessage("请分析订单 …")]
+messages = prompt.messages   # 渲染结果直接作为对话的起始消息交给模型
+```
+
+Java 类比：像 Thymeleaf / FreeMarker 模板，或项目里沉淀的 prompt 常量库；`prompts/get` 就是「模板 + 参数 → 渲染结果」。
+
+与 Tool 的区别：Tool 的结果进入模型后模型**继续推理**；Prompt 的结果是**喂给模型的初始指令**，执行权在应用侧。一句话：**Tool 是「函数」，Prompt 是「开场白」。**
+
+### 3.5 一个贯穿例子：三者怎么配合
+
+场景：企业运维分析 Agent（正是阶段 3 项目）。同一个 MCP Server（ops-server）同时暴露三个原语，各司其职：
+
+```text
+用户问"订单 ORD-2025-0001 到哪了？"
+  -> 模型自主选中 Tool: query_order(order_id)     （模型发起）
+  -> 应用批准后 call_tool，Server 查库返回状态      （执行）
+  -> 模型组织答案："已发货，预计明天送达"
+
+应用启动时主动读取 Resource: db://tables            （应用发起）
+  -> 把表清单拼进 system prompt
+  -> 模型"知道"有哪些表，但从未调用过 resource      （注入上下文）
+
+用户点击"生成故障报告"按钮                          （用户发起）
+  -> 应用选择 Prompt: order-analysis(order_id)
+  -> 拿到模板渲染出的消息序列，作为对话起始消息       （开场白）
+```
+
+三种原语解决三种不同的问题：**Tool 让模型拿到实时数据，Resource 让应用把静态上下文喂给模型，Prompt 让用户快速套用固定格式**——它们经常在同一个 Server 里共存。
+
+#### 共用代码示例：一个订单分析 MCP Server
+
+下面用同一个 `order_id` 把三种原语串起来。注意：Server 负责**暴露能力**，Client/Host 负责**决定何时使用**；三种原语的调用入口不同，但可以服务于同一个业务流程。
+
+Server 侧：同一个 Server 同时注册 Tool、Resource 和 Prompt。
+
+```python
+from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp.prompts import SystemMessage, UserMessage
+
+mcp = FastMCP("order-analysis-server")
+
+
+@mcp.tool()
+def query_order(order_id: str) -> dict:
+  """查询订单的实时状态，供模型按需调用。"""
+  return {
+    "order_id": order_id,
+    "status": "已发货",
+    "eta": "2025-12-20",
+  }
+
+
+@mcp.resource("db://orders/{order_id}")
+def order_context(order_id: str) -> str:
+  """读取订单分析所需的背景数据，供应用注入上下文。"""
+  return f"订单 {order_id}：金额 299.00 元，客户等级：黄金"
+
+
+@mcp.prompt("order-analysis")
+def order_analysis(order_id: str):
+  """生成订单分析的固定消息模板，供用户或应用选择。"""
+  return [
+    SystemMessage("你是订单分析专家。请输出状态、风险和建议。"),
+    UserMessage(f"请分析订单 {order_id}"),
+  ]
+```
+
+Client/Host 侧：三种原语分别走不同的流程。
+
+```python
+order_id = "ORD-2025-0001"
+
+# 1. Resource：应用主动读取，再把数据注入模型上下文
+resource = await session.read_resource(f"db://orders/{order_id}")
+context = resource.contents[0].text
+
+# 2. Prompt：用户点击“订单分析”后，应用主动获取渲染后的消息模板
+prompt = await session.get_prompt(
+  "order-analysis",
+  {"order_id": order_id},
+)
+messages = list(prompt.messages)
+messages.insert(0, {"role": "system", "content": f"订单背景：{context}"})
+
+# 3. Tool：应用把工具清单交给模型；模型判断需要实时状态后发起调用
+available_tools = await session.list_tools()
+tool_result = await session.call_tool(
+  "query_order",
+  {"order_id": order_id},
+)
+
+# 实际 Agent 中，tool_result 会转换成 ToolMessage 再交给模型继续推理。
+messages.append({"role": "tool", "content": str(tool_result.content)})
+answer = await model.ainvoke(messages, tools=available_tools.tools)
+```
+
+对照这段代码可以看到：`read_resource` 是**应用读数据**，`get_prompt` 是**应用选模板**，`call_tool` 是**响应模型的工具调用**。示例为了突出三种原语而省略了模型首次调用和“模型返回 tool call 后再执行”的循环；真实 Agent 中应由模型先提出 `query_order`，Host 完成批准后再调用 Tool。
+
+### 3.6 如何选择：一张决策表
 
 | 你要暴露的能力 | 选择 | 原因 |
 |---|---|---|
