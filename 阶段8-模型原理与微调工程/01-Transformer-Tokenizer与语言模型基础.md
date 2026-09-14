@@ -704,6 +704,168 @@ $$
 
 ### 5.1 Batch、Sequence 与显存
 
+#### 5.1.1 三个量分别是什么
+
+```text
+batch_size       = 一次并行处理多少条样本
+sequence_length  = 每条样本包含多少个 Token
+hidden_size      = 每个 Token 的隐藏向量有多少个数值
+```
+
+例如：
+
+```text
+batch_size = 2
+sequence_length = 128
+hidden_size = 4096
+```
+
+输入 Token ID 的形状是：
+
+```text
+[2, 128]
+```
+
+经过 Embedding 后，隐藏状态的形状是：
+
+```text
+[2, 128, 4096]
+```
+
+也就是同时处理 2 条序列，每条序列有 128 个 Token，每个 Token 用 4096 个数表示。
+
+#### 5.1.2 Batch Size 的作用
+
+`batch_size` 表示一次前向计算同时放入多少条样本。增大它通常可以提高 GPU 利用率和训练吞吐，但会增加显存：
+
+```text
+batch_size = 1  -> 一次处理 1 条样本
+batch_size = 8  -> 一次处理 8 条样本
+```
+
+在训练中，Batch Size 影响梯度估计：
+
+- 较大的 Batch：梯度更平滑，吞吐可能更高，但显存需求更大；
+- 较小的 Batch：显存压力较低，但梯度噪声更大，训练可能更不稳定；
+- 过大的 Batch：不一定带来更好的效果，可能需要重新调整学习率和训练步数。
+
+在推理服务中，Batch 还表示同时处理多少个请求。动态 Batch 或 Continuous Batching 可以把不同请求合并，提高吞吐，但会增加排队和调度复杂度。
+
+#### 5.1.3 Sequence Length 的作用
+
+`sequence_length` 是一条样本中的 Token 数，不是字符数，也不是模型层数：
+
+```text
+"请查询订单状态" -> 可能是若干个 Token
+```
+
+实际长度由目标模型的 Tokenizer 决定。Sequence Length 影响：
+
+- 能放入多少上下文；
+- Attention 的计算量；
+- 训练激活值大小；
+- 推理时 KV Cache 的大小；
+- 输入 Token 成本和首 Token 延迟。
+
+标准 Self-Attention 会产生大致为 $S\times S$ 的注意力分数矩阵，其中 $S$ 是序列长度。因此：
+
+```text
+sequence_length 从 1,000 增加到 2,000
+Token 数约增加 2 倍
+Attention 分数矩阵约增加 4 倍
+```
+
+这就是长上下文显存和计算压力增长很快的主要原因之一。实际模型可能使用滑动窗口、稀疏注意力、Paged Attention 或其他优化，不能简单地把所有模型都视为标准全量 Attention。
+
+#### 5.1.4 Hidden Size 的作用
+
+`hidden_size` 是每个 Token 的内部表示宽度。它越大，单个 Token 能携带的表示维度通常越丰富，但矩阵乘法、参数量和显存也会增加。
+
+若隐藏状态形状为 `[B, S, H]`，其元素数量为：
+
+$$
+B\times S\times H
+$$
+
+例如：
+
+$$
+2\times128\times4096=1,048,576
+$$
+
+如果使用 FP16，每个元素约占 2 bytes，这一份隐藏状态约占 2 MiB。实际运行中，每一层还会产生 Q、K、V、MLP 中间结果、残差和反向传播所需的保存值。
+
+#### 5.1.5 显存到底存了什么
+
+训练和推理的显存构成不同。
+
+训练时通常包括：
+
+```text
+模型权重
++ 梯度
++ Optimizer States，例如 Adam 的一阶和二阶动量
++ 前向激活值
++ Attention / MLP 临时张量
++ CUDA 工作区和通信缓冲区
+```
+
+推理时通常不保存梯度和优化器状态，但仍需要：
+
+```text
+模型权重
++ KV Cache
++ 当前请求的隐藏状态和临时张量
++ Batch 中其他请求的中间数据
+```
+
+因此，同一个模型“能推理”不代表“能训练”。训练通常需要远多于权重本身的显存。
+
+#### 5.1.6 一个粗略例子
+
+假设：
+
+```text
+batch_size = 4
+sequence_length = 2048
+hidden_size = 4096
+```
+
+仅一个 `[B, S, H]` 隐藏状态的元素数量就是：
+
+$$
+4\times2048\times4096=33,554,432
+$$
+
+若使用 FP16，仅这一份 Tensor 约占 64 MiB。但一个 Transformer 有很多层，每层可能同时保留多个激活和中间结果，因此不能用这一个数字代表总显存。
+
+#### 5.1.7 Batch 与 Sequence 的权衡
+
+在固定显存下，通常存在这样的取舍：
+
+```text
+增大 batch_size       -> 吞吐增加，但并发显存增加
+增大 sequence_length  -> 上下文变长，但 Attention 和激活开销增加
+减小 batch_size       -> 可以容纳更长序列，但吞吐下降
+```
+
+训练时常见策略是：
+
+- 减小物理 Batch Size；
+- 使用 Gradient Accumulation 保持较大的有效 Batch；
+- 使用混合精度；
+- 使用 Gradient Checkpointing 减少激活保存；
+- 按 Token 数而不是样本条数控制 Batch；
+- 使用 LoRA/QLoRA 减少可训练参数和优化器状态。
+
+推理时常见策略是：
+
+- 限制最大输入和输出长度；
+- 对长上下文做摘要或检索裁剪；
+- 使用 Continuous Batching；
+- 使用量化和高效 KV Cache 管理；
+- 区分 TTFT 和 Decode 阶段优化。
+
 训练显存不只包含模型权重，还包含梯度、优化器状态和激活值：
 
 ```text
