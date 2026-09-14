@@ -38,7 +38,27 @@
 ### 3. Agent 核心能力
 
 ```text
-- Agent Skills：可复用能力包、渐进式加载、Skill 与 Tool/MCP 的组合（前沿加分项）
+用户目标
+- 能运行、调试并修改 Python Agent 项目
+- 能为 Agent 编写单元测试和集成测试
+
+推荐课程：
+
+- [AI Python for Beginners](https://www.deeplearning.ai/courses/ai-python-for-beginners)
+- [Hugging Face AI Agents Course](https://huggingface.co/learn/agents-course)
+
+中文资源补充：
+
+- [廖雪峰的 Python 教程](https://liaoxuefeng.com/books/python/introduction/index.html)
+- [FastAPI 中文文档](https://fastapi.tiangolo.com/zh/)
+- [Python 官方中文文档](https://docs.python.org/zh-cn/3/)
+- [Datawhale：Hello Agents《从零开始构建智能体》](https://github.com/datawhalechina/hello-agents)
+
+### 阶段 1：LLM 基础与 LangChain，2 到 3 周
+
+使用 Python 直接调用模型，再用 LangChain 封装一遍。
+
+学习内容：
 重点掌握：
 
 - Tool Calling
@@ -415,6 +435,25 @@ cost
 
 验收标准：能解释 Transformer 和 Tokenizer 的作用；能选择 SFT、LoRA、QLoRA 或 DPO；能用独立评测集证明微调收益或决定不发布；能报告显存、吞吐、延迟、成本和安全指标。
 
+### 阶段 9：Agent Harness 工程，3 到 4 周
+
+目标：构建让 Agent 在真实环境中持续、可控、可验证完成任务的运行与工程控制层。
+
+学习内容：
+
+- Agent Harness 与 Agent Loop、Runtime、Tool、Workflow、Platform 的边界
+- 任务状态、Workspace、Sandbox、Filesystem、MCP 和资源生命周期
+- Planning、Context、Skills、Memory、Sub-agent 和长任务恢复的组合
+- Understand → Plan → Act → Observe → Verify → Repair 的执行闭环
+- Agent Legibility：仓库知识地图、AGENTS.md、架构文档、运行手册和执行计划
+- 测试、Lint、编译、业务断言、评测和人工审批作为 Ground Truth
+- 权限、密钥、租户隔离、限流、超时、重试、幂等和审计
+- Run Event、Trace、成本、P95、验证通过率和人工升级率
+
+建议实践：构建一个 Coding Agent Harness，接收 Issue，在隔离工作区中修改代码，运行测试并根据失败反馈有限次修复，最终输出 Diff、测试证据、Trace 和风险报告。
+
+验收标准：能解释 Harness 与 Agent Loop、Runtime、Tool、Workflow 和 Platform 的边界；能设计任务状态和验证反馈闭环；能让 Agent 在隔离环境中完成任务并提供可回放证据。
+
 ## 三、Python 主线与 Java 拓展
 
 ### Python 主线：LangChain + LangGraph + Deep Agents
@@ -462,15 +501,7 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 
 ### Python Agent 主线
 
-| 仓库 | 学习重点 |
-|---|---|
-| [langchain-ai/langchain](https://github.com/langchain-ai/langchain) | Python LLM、Prompt、Tools、RAG 基础 |
-| [langchain-ai/langgraph](https://github.com/langchain-ai/langgraph) | 有状态 Agent、图工作流、Checkpoint |
-| [langchain-ai/deepagents](https://github.com/langchain-ai/deepagents) | 规划、子 Agent、文件系统和长任务 |
-| [langchain-ai/langsmith-sdk](https://github.com/langchain-ai/langsmith-sdk) | Tracing、评测和调试集成 |
-| [openai/openai-agents-python](https://github.com/openai/openai-agents-python) | Agent、Tools、Handoff、Guardrails、Tracing |
 | [run-llama/llama_index](https://github.com/run-llama/llama_index) | RAG、数据连接、文档 Agent |
-| [huggingface/smolagents](https://github.com/huggingface/smolagents) | 轻量 Agent、Code Agent、工具调用 |
 
 ### Java 拓展
 
@@ -480,18 +511,9 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 | [langchain4j/langchain4j](https://github.com/langchain4j/langchain4j) | Java LLM、RAG、Tools、Agents |
 | [langchain4j/langchain4j-examples](https://github.com/langchain4j/langchain4j-examples) | Java 示例项目 |
 | [alibaba/spring-ai-alibaba](https://github.com/alibaba/spring-ai-alibaba) | Spring AI 企业级扩展与 Agent 示例 |
-| [modelcontextprotocol/java-sdk](https://github.com/modelcontextprotocol/java-sdk) | Java MCP Client/Server |
-| [quarkiverse/quarkus-langchain4j](https://github.com/quarkiverse/quarkus-langchain4j) | Quarkus + LangChain4j |
-
-### 其他 Agent 框架
-
-| 仓库 | 学习重点 |
 |---|---|
 | [langchain-ai/langgraph](https://github.com/langchain-ai/langgraph) | 有状态 Agent、图工作流、Checkpoint |
 | [openai/openai-agents-python](https://github.com/openai/openai-agents-python) | Agent、Tools、Handoff、Guardrails、Tracing |
-| [microsoft/agent-framework](https://github.com/microsoft/agent-framework) | 生产级 Agent、工作流、人工介入、可观测性 |
-| [crewAIInc/crewAI](https://github.com/crewAIInc/crewAI) | 多角色 Agent、Crews、Flows |
-| [run-llama/llama_index](https://github.com/run-llama/llama_index) | RAG、数据连接、文档 Agent |
 | [huggingface/smolagents](https://github.com/huggingface/smolagents) | 轻量 Agent、Code Agent、工具调用 |
 
 ### MCP 与协议
@@ -567,7 +589,7 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 
 > 基于 Python、LangChain、LangGraph、PGVector 和 Reranker 构建企业知识库 Agent，支持多租户文档权限、流式响应、引用溯源和增量索引；通过 150 条 Golden Dataset 评测，提升 Context Recall，并将平均响应延迟控制在目标范围内。
 
-## 六、8 个月安排
+## 六、9 个月安排
 
 | 时间 | 目标 |
 |---|---|
@@ -579,6 +601,7 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 | 第 6 个月 | Agent Skills 与能力工程化、作品集整合、Java 集成练习 |
 | 第 7 个月 | Agent 高阶能力补全：A2A、Memory、Reflection、多模态、幂等与补偿 |
 | 第 8 个月 | Transformer、微调、量化、推理服务和模型适配实验 |
+| 第 9 个月 | Agent Harness、Coding Agent 执行环境、验证反馈和生产治理 |
 
 ## 七、学习优先级
 
@@ -596,6 +619,7 @@ Python 工程基础
   > Agent Skills
   > Agent 高阶能力
   > 模型原理与微调工程
+  > Agent Harness 工程
   > Java 集成
 ```
 

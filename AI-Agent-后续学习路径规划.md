@@ -222,7 +222,27 @@ LlamaIndex（数据/RAG 框架）、OpenAI Agents SDK（Guardrails/Handoff/Traci
 
 **验收**：能解释 Transformer 和 Tokenizer；能选择 SFT、LoRA、QLoRA 或 DPO；能报告质量、显存、延迟、吞吐、成本和安全指标；微调无收益时能做出不发布的结论。
 
-## 三、时间表（第 4~8 个月）
+### 阶段 9：Agent Harness 工程（新增主线，约 3~4 周）
+
+Harness 不是另一个模型或 Agent 框架，而是包围 Agent Loop 的运行与工程控制层。按 [阶段 9 README](阶段9-Agent-Harness工程/README.md) 顺序学习 01→05。
+
+学习顺序：
+
+```text
+01 Harness 概念与分层架构
+  -> 02 Runtime、执行环境与任务编排
+  -> 03 Agent Legibility、验证闭环与反馈系统
+  -> 04 安全、可靠性与生产治理
+  -> 05 综合实践：可验证的 Coding Agent Harness
+```
+
+重点学习：如何为 Agent 提供可发现的仓库知识、隔离的 Workspace/Sandbox、可执行的测试反馈、有限循环和恢复机制，以及可审计的运行证据。
+
+产出：一个能够接收代码任务、创建隔离工作区、修改代码、运行验证、根据失败结果修复并输出 Diff/测试/Trace 报告的 Coding Agent Harness。
+
+**验收**：能解释 Harness 与 Agent Loop、Runtime、Tool、Workflow、Platform 的边界；能设计任务状态和验证反馈闭环；能处理权限、超时、取消、恢复、人工审批和运行审计。
+
+## 三、时间表（第 4~9 个月）
 
 | 时间 | 内容 | 里程碑 |
 | --- | --- | --- |
@@ -232,6 +252,7 @@ LlamaIndex（数据/RAG 框架）、OpenAI Agents SDK（Guardrails/Handoff/Traci
 | 第 6 个月中后段 | 框架了解包 + Java 拓展练习 + 作品集整合 | 三个项目可演示、可讲解 |
 | 第 7 个月 | 阶段 7 文档 01~06 + 综合实践 | 高阶能力闭环完成 |
 | 第 8 个月 | 阶段 8 文档 01~05 + 模型适配实验 | 模型微调与推理实验完成 |
+| 第 9 个月 | 阶段 9 文档 01~05 + Coding Agent Harness | Harness 执行与验证闭环完成 |
 
 ## 四、终点验收清单（对照能力模型逐项勾选）
 
@@ -244,5 +265,6 @@ LlamaIndex（数据/RAG 框架）、OpenAI Agents SDK（Guardrails/Handoff/Traci
 - [ ] 阶段 6：Agent Skills（开放格式、Runtime 接入、权限治理、评测与 Trace）
 - [ ] 阶段 7：Agent 高阶能力补全（A2A、Memory、Reflection、多模态、幂等与补偿）
 - [ ] 阶段 8：模型原理与微调工程（Transformer、Tokenizer、LoRA/QLoRA、量化与推理）
+- [ ] 阶段 9：Agent Harness 工程（Runtime、Sandbox、验证反馈、可靠性与治理）
 - [ ] Java 拓展小练习完成
 - [ ] 三个作品集项目均有 README + 实测指标
