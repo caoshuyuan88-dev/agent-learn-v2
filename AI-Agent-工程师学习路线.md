@@ -38,26 +38,11 @@
 ### 3. Agent 核心能力
 
 ```text
-用户目标
-  -> 任务规划
-  -> 选择工具
-  -> 执行工具
-  -> 观察结果
-  -> 判断是否继续
-  -> 输出结果
-```
-
+- Agent Skills：可复用能力包、渐进式加载、Skill 与 Tool/MCP 的组合（前沿加分项）
 重点掌握：
 
 - Tool Calling
-- Agent State
-- Memory
-- Planning、ReAct、Reflection
-- Human-in-the-loop
-- Retry、Timeout、Checkpoint
-- Handoff、Sub-agent
-- Parallel、Sequential、Conditional Workflow
-- 长任务恢复、幂等性和补偿机制
+ - Skill 能力包的目录约定、版本管理、权限与评测
 
 ### 4. MCP 与 Agent 协议
 
@@ -375,6 +360,25 @@ cost
 - [OpenTelemetry 中文文档](https://opentelemetry.io/zh/docs/)
 - [Datawhale：Hello Agents 性能评估章节](https://github.com/datawhalechina/hello-agents)
 
+### 阶段 6：Agent Skills 与能力工程化，2 到 3 周
+
+目标：把面向某类任务的知识、流程、参考资料和脚本封装成可发现、可加载、可治理的 Skill，并接入已有 Agent Runtime。
+
+学习内容：
+
+- Agent Skill 的统一抽象与开放格式
+- `SKILL.md`、元数据、`scripts/`、`references/`、`assets/`
+- Discovery、Activation、Execution 与渐进式披露
+- Skill Registry、版本管理、依赖和兼容性
+- Skill 与 Tool、Prompt、Workflow、Memory、MCP 的边界
+- 多租户、权限隔离、只读 Skill、人工审批和沙箱执行
+- Skill 的确定性测试、轨迹评测、回归门禁和 Trace
+- 在 LangGraph、Deep Agents 或自研 Runtime 中实现 Skill Loader
+
+建议实践：开发一个 `incident-analysis` 或 `code-review` Skill，分别接入一个 LangGraph Agent 和一个 Deep Agent，比较加载方式、上下文消耗、任务完成率和失败模式。
+
+验收标准：能独立设计一个符合开放格式的 Skill；能解释 Skill 与 Tool/MCP/Workflow 的边界；能实现按租户或角色加载 Skill；能用评测集和 Trace 证明 Skill 的收益与风险。
+
 ## 三、Python 主线与 Java 拓展
 
 ### Python 主线：LangChain + LangGraph + Deep Agents
@@ -536,7 +540,7 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 | 第 3 个月 | LangChain Tools、MCP、API 集成、权限控制 |
 | 第 4 个月 | LangGraph、Checkpoint、Human-in-the-loop、Deep Agents |
 | 第 5 个月 | Agent 评测、LangSmith/Langfuse、成本监控、安全 |
-| 第 6 个月 | 完成 2 到 3 个 Python 作品集项目，补充 Java 集成练习 |
+| 第 6 个月 | Agent Skills 与能力工程化、作品集整合、Java 集成练习 |
 
 ## 七、学习优先级
 
@@ -551,6 +555,7 @@ Python 工程基础
   > Agent 评测
   > 可观测性
   > 安全与部署
+  > Agent Skills
   > Java 集成
 ```
 

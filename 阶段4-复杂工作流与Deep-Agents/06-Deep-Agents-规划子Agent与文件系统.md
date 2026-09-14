@@ -10,6 +10,7 @@
 - 解释 Plan-and-Execute 与 ReAct 的差别，以及何时用哪个；
 - 说出「子 Agent」在 Deep Agent 里的角色（上下文隔离、专业分工）；
 - 用 `deepagents` 的 `create_deep_agent` 跑通一个带文件系统能力的 Agent；
+- 理解 Agent Skill 如何把一类任务的说明、参考资料和脚本封装成可复用能力包；
 - 在 LangGraph 里手搓一个「规划 + 执行循环」的深 Agent，并对比与 `deepagents` 库的取舍；
 - 遵守「LangGraph vs Deep Agents」的选型纪律，不无理由混用。
 
@@ -168,6 +169,28 @@ def safe_read(rel_path: str) -> str:
         raise ValueError("文件过大")
     return target.read_text()
 ```
+
+### 4.3 Agent Skill：把能力做成可复用资产
+
+Agent Skill 适合封装「完成某类任务所需的操作知识与执行资产」，例如代码审查 Skill 可以包含任务说明、检查清单、参考规范和只读分析脚本。它不是另一个 Tool，也不是把所有内容永久塞进系统 Prompt：Agent 先根据元数据发现 Skill，再按需加载详细说明或脚本。
+
+一个最小 Skill 可以采用如下结构：
+
+```text
+skills/code-review/
+├── SKILL.md          # 名称、适用场景、使用步骤和边界
+├── references/       # 按需读取的规范或领域资料
+└── scripts/          # 受权限约束的可执行脚本
+```
+
+边界要明确：Tool 执行动作，MCP 提供标准化的工具/资源/提示暴露协议，Workflow 负责确定性编排，Skill 负责组织一类任务的知识、流程提示和相关资产。Skill 规范本身不定义完整的权限、审批、审计或评测体系；在工程实现中仍应复用阶段 3 的安全控制，以及阶段 5 的 Golden Dataset、轨迹评测和 Trace，不能因为 Skill 是可复用包就绕过这些控制。
+
+资料依据：
+
+- [Agent Skills Specification](https://agentskills.io/specification)
+- [MCP Tools](https://modelcontextprotocol.io/docs/concepts/tools)
+- [MCP Prompts](https://modelcontextprotocol.io/docs/concepts/prompts)
+- [Deep Agents Skills](https://docs.langchain.com/oss/python/deepagents/skills)
 
 ## 五、deepagents 库实战
 
