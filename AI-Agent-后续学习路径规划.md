@@ -202,7 +202,27 @@ LlamaIndex（数据/RAG 框架）、OpenAI Agents SDK（Guardrails/Handoff/Traci
 
 ---
 
-## 三、时间表（第 4~7 个月）
+### 阶段 8：模型原理与微调工程（进阶选修，约 3~5 周）
+
+阶段 8 用于补齐 Transformer、Tokenizer、模型训练、参数高效微调、量化和推理服务能力。按 [阶段 8 README](阶段8-模型原理与微调工程/README.md) 顺序学习 01→05。
+
+学习顺序：
+
+```text
+01 Transformer、Tokenizer 与语言模型基础
+  -> 02 预训练、SFT、LoRA、QLoRA 与 DPO
+  -> 03 微调数据、实验设计与评测
+  -> 04 量化、推理与模型服务
+  -> 05 综合实践：领域模型适配实验
+```
+
+定位：这是应用型 Agent 工程师的进阶选修，不是前置主线。必须掌握“什么时候不该微调”、微调后的评测和回滚；目标岗位涉及模型适配、私有化部署、推理优化或算法工程时，再深入训练细节。
+
+产出：一个可复现的 LoRA 或 QLoRA 实验，包含数据集版本、基座/微调模型对比、Agent 任务指标、量化推理数据和发布决策。
+
+**验收**：能解释 Transformer 和 Tokenizer；能选择 SFT、LoRA、QLoRA 或 DPO；能报告质量、显存、延迟、吞吐、成本和安全指标；微调无收益时能做出不发布的结论。
+
+## 三、时间表（第 4~8 个月）
 
 | 时间 | 内容 | 里程碑 |
 | --- | --- | --- |
@@ -211,6 +231,7 @@ LlamaIndex（数据/RAG 框架）、OpenAI Agents SDK（Guardrails/Handoff/Traci
 | 第 6 个月前半月 | 阶段 6 文档 01~04 + Skill 综合实践 | Skill 能力包可运行、可评测 |
 | 第 6 个月中后段 | 框架了解包 + Java 拓展练习 + 作品集整合 | 三个项目可演示、可讲解 |
 | 第 7 个月 | 阶段 7 文档 01~06 + 综合实践 | 高阶能力闭环完成 |
+| 第 8 个月 | 阶段 8 文档 01~05 + 模型适配实验 | 模型微调与推理实验完成 |
 
 ## 四、终点验收清单（对照能力模型逐项勾选）
 
@@ -222,5 +243,6 @@ LlamaIndex（数据/RAG 框架）、OpenAI Agents SDK（Guardrails/Handoff/Traci
 - [ ] 能力模型 6：Python 平台能力（DB/缓存/任务/监控/部署，选学项至少 Docker + 一种监控）
 - [ ] 阶段 6：Agent Skills（开放格式、Runtime 接入、权限治理、评测与 Trace）
 - [ ] 阶段 7：Agent 高阶能力补全（A2A、Memory、Reflection、多模态、幂等与补偿）
+- [ ] 阶段 8：模型原理与微调工程（Transformer、Tokenizer、LoRA/QLoRA、量化与推理）
 - [ ] Java 拓展小练习完成
 - [ ] 三个作品集项目均有 README + 实测指标

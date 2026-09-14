@@ -395,6 +395,26 @@ cost
 
 验收标准：能实现任务型 A2A 调用；能区分 Checkpoint、Memory 和 RAG；能限制 Reflection 循环；能安全处理多模态输入；能证明写操作重复执行不会产生重复副作用。
 
+### 阶段 8：模型原理与微调工程，3 到 5 周（进阶选修）
+
+目标：理解 Transformer、Tokenizer、预训练和推理的基本原理，并完成一次可评测、可复现的 LoRA 或 QLoRA 领域适配实验。
+
+学习内容：
+
+- Transformer、Self-Attention、位置编码、Embedding 和 Decoder-only LLM
+- Tokenizer、上下文窗口、Loss、Perplexity、KV Cache 和推理延迟
+- 预训练、Continued Pretraining、SFT、LoRA、QLoRA 和 DPO
+- 微调数据清洗、脱敏、划分、版本和实验记录
+- Agent 场景的 Tool Calling、Structured Output、安全和任务完成率评测
+- FP16/BF16、INT8/INT4、量化误差、吞吐、TTFT 和 P95 延迟
+- Transformers、PEFT、TRL、bitsandbytes、vLLM 或 TGI 的基本使用
+
+学习边界：不要求从零训练大模型，不要求一开始深入完整 RLHF 或分布式训练框架。应用型 Agent 工程师应先掌握“何时微调、如何评测、如何部署和回滚”，模型算法岗位再进一步深入训练细节。
+
+建议实践：选择一个小型开源指令模型，为运维工具调用或研发需求分析任务制作脱敏数据，完成 LoRA/QLoRA 训练、基线对比、量化推理和发布决策。
+
+验收标准：能解释 Transformer 和 Tokenizer 的作用；能选择 SFT、LoRA、QLoRA 或 DPO；能用独立评测集证明微调收益或决定不发布；能报告显存、吞吐、延迟、成本和安全指标。
+
 ## 三、Python 主线与 Java 拓展
 
 ### Python 主线：LangChain + LangGraph + Deep Agents
@@ -547,7 +567,7 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 
 > 基于 Python、LangChain、LangGraph、PGVector 和 Reranker 构建企业知识库 Agent，支持多租户文档权限、流式响应、引用溯源和增量索引；通过 150 条 Golden Dataset 评测，提升 Context Recall，并将平均响应延迟控制在目标范围内。
 
-## 六、7 个月安排
+## 六、8 个月安排
 
 | 时间 | 目标 |
 |---|---|
@@ -558,6 +578,7 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 | 第 5 个月 | Agent 评测、LangSmith/Langfuse、成本监控、安全 |
 | 第 6 个月 | Agent Skills 与能力工程化、作品集整合、Java 集成练习 |
 | 第 7 个月 | Agent 高阶能力补全：A2A、Memory、Reflection、多模态、幂等与补偿 |
+| 第 8 个月 | Transformer、微调、量化、推理服务和模型适配实验 |
 
 ## 七、学习优先级
 
@@ -574,6 +595,7 @@ Python 工程基础
   > 安全与部署
   > Agent Skills
   > Agent 高阶能力
+  > 模型原理与微调工程
   > Java 集成
 ```
 
