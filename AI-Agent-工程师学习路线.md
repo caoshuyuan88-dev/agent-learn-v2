@@ -379,6 +379,22 @@ cost
 
 验收标准：能独立设计一个符合开放格式的 Skill；能解释 Skill 与 Tool/MCP/Workflow 的边界；能实现按租户或角色加载 Skill；能用评测集和 Trace 证明 Skill 的收益与风险。
 
+### 阶段 7：Agent 高阶能力补全，3 到 4 周
+
+目标：补齐跨 Agent 协作、记忆、Reflection、多模态和可靠执行能力，并把它们接入已有的研发效能 Agent。
+
+学习内容：
+
+- A2A：Agent Card、Task 生命周期、流式更新、Webhook、认证和与 MCP 的边界
+- Memory：Checkpoint、短期记忆、长期记忆、Store、命名空间、隐私和删除
+- Reflection：Evaluator-Optimizer、结构化反馈、停止条件、预算和评测
+- 多模态输入：图片、PDF、来源保留、Schema 校验和 Responses API
+- 幂等与补偿：幂等键、写入重试、Saga、部分成功、人工接管和 Durable Execution
+
+建议实践：为研发效能 Agent 接入一个远程需求分析 Agent，保存用户级项目偏好，使用 Reflection 审核方案，解析架构图或 PDF，并对 Issue/分支创建实现幂等和补偿。
+
+验收标准：能实现任务型 A2A 调用；能区分 Checkpoint、Memory 和 RAG；能限制 Reflection 循环；能安全处理多模态输入；能证明写操作重复执行不会产生重复副作用。
+
 ## 三、Python 主线与 Java 拓展
 
 ### Python 主线：LangChain + LangGraph + Deep Agents
@@ -531,7 +547,7 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 
 > 基于 Python、LangChain、LangGraph、PGVector 和 Reranker 构建企业知识库 Agent，支持多租户文档权限、流式响应、引用溯源和增量索引；通过 150 条 Golden Dataset 评测，提升 Context Recall，并将平均响应延迟控制在目标范围内。
 
-## 六、6 个月安排
+## 六、7 个月安排
 
 | 时间 | 目标 |
 |---|---|
@@ -541,6 +557,7 @@ Java 不作为首要学习方向，仅投入 10% 到 15% 的时间，用于以�
 | 第 4 个月 | LangGraph、Checkpoint、Human-in-the-loop、Deep Agents |
 | 第 5 个月 | Agent 评测、LangSmith/Langfuse、成本监控、安全 |
 | 第 6 个月 | Agent Skills 与能力工程化、作品集整合、Java 集成练习 |
+| 第 7 个月 | Agent 高阶能力补全：A2A、Memory、Reflection、多模态、幂等与补偿 |
 
 ## 七、学习优先级
 
@@ -556,6 +573,7 @@ Python 工程基础
   > 可观测性
   > 安全与部署
   > Agent Skills
+  > Agent 高阶能力
   > Java 集成
 ```
 

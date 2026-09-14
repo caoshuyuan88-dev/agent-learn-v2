@@ -1,8 +1,8 @@
 # 后续学习路径规划（阶段 3 结束后）
 
-> 依据《AI-Agent-工程师学习路线.md》「一、目标岗位能力模型」逐条核对阶段 0~5 现有学习资料后，重新整理从「阶段 3 学完」出发的后续学习路径。
+> 依据《AI-Agent-工程师学习路线.md》「一、目标岗位能力模型」逐条核对阶段 0~7 现有学习资料后，重新整理从「阶段 3 学完」出发的后续学习路径。
 >
-> 前提说明：阶段 0/1/3/4 学习文档齐备；**阶段 2 目录内未发现学习文档**（仅 README 与外部项目链接 `hello-rag-langchain`）——若 RAG 项目已按路线要求完成（含 Hybrid/Rerank/引用溯源/权限/评测），视为已覆盖；否则需补 RAG 专项，其能力仍属于岗位能力模型第 2 块。**阶段 5 尚无学习文档**，本规划给出文档拆解建议。
+> 前提说明：阶段 0/1/3/4/5/6/7 学习文档已建立；**阶段 2 目录内未发现学习文档**（仅 README 与外部项目链接 `hello-rag-langchain`）——若 RAG 项目已按路线要求完成（含 Hybrid/Rerank/引用溯源/权限/评测），视为已覆盖；否则需补 RAG 专项。
 >
 > 路线原文 6 个月安排：第 1 月 Python/LLM 基础 → 第 2 月 RAG → 第 3 月 Tools/MCP → 第 4 月 LangGraph/HITL/Deep Agents → 第 5 月 评测/可观测/成本/安全 → 第 6 月 作品集 + Java 集成。**你当前位于第 3 月末**，本规划接续第 4 个月。
 
@@ -19,11 +19,11 @@
 | Structured Output、JSON Schema | ✅ | 阶段1《Streaming 与结构化输出》 |
 | Function Calling / Tool Calling | ✅ | 阶段1《Tool Calling》、阶段3 全部 |
 | Embedding | ✅ | 阶段1《Tool Calling 与 Embedding》 |
-| **多模态输入** | ❌ | **补丁包-4** |
+| **多模态输入** | ❌ | **阶段7-04** |
 | 模型选择、Fallback、限流和成本控制 | ✅（自核） | 阶段1《LangChain 核心与模型工程化》；限流/成本的落地监控属阶段5 |
 | Prompt 模板化 | ✅ | 阶段1《LangChain 核心与模型工程化》 |
 | **Prompt 版本管理** | ❌ | 阶段5-03（Langfuse Prompt 管理） |
-| **Responses API**（OpenAI 新一代） | ⚠️ 未单列 | **补丁包-4**（可选） |
+| **Responses API**（OpenAI 新一代） | ⚠️ 未单列 | **阶段7-04** |
 | Transformer/Attention/Tokenizer/SFT/DPO/RLHF/推理量化（理解层） | ⚠️ 无专文 | 可选补丁：1 篇概念综述即可 |
 
 ### 2. RAG 知识库工程（阶段 2）
@@ -36,17 +36,17 @@
 | --- | --- | --- |
 | Tool Calling | ✅ | 阶段1/阶段3 |
 | Agent State | ✅ | 阶段3-07 入门、阶段4-01/02 深入 |
-| **Memory** | ❌ 无专项 | **补丁包-2**（阶段4-05 只覆盖执行状态持久化，非记忆设计） |
+| **Memory** | ❌ 无专项 | **阶段7-02**（阶段4-05 只覆盖执行状态持久化，非记忆设计） |
 | Planning | ✅ | 阶段4-06 Deep Agents 规划、阶段4-03 |
 | ReAct | ✅ | 阶段1/阶段3-07 |
-| **Reflection（自我反思）** | ❌ | **补丁包-3** |
+| **Reflection（自我反思）** | ❌ | **阶段7-03** |
 | Human-in-the-loop | ✅ | 阶段3-03、阶段4-04 |
 | Retry、Timeout、Checkpoint | ✅ | 阶段3-02、阶段4-05 |
 | Handoff、Sub-agent | ✅ | 阶段4-03、阶段4-06 |
 | Parallel / Sequential / Conditional | ✅ | 阶段4-01/02 |
 | 长任务恢复 | ✅ | 阶段4-05/07 |
 | 幂等性 | ✅（概念） | 阶段3-02；写入工具不自动重试 |
-| **补偿机制（事务性补偿）** | ⚠️ 弱 | **补丁包-5** 深化 |
+| **补偿机制（事务性补偿）** | ⚠️ 弱 | **阶段7-05** 深化 |
 | **Agent Skills（能力包）** | ❌ 无专项 | **阶段 6（前沿加分项）**；阶段4-06 先建立概念，阶段6完成 Runtime、治理、评测与 Trace |
 
 ### 4. MCP 与 Agent 协议
@@ -58,8 +58,8 @@
 | Stdio / SSE / Streamable HTTP | ✅ | 阶段3-04/05 |
 | 工具参数 Schema 与权限控制 | ✅ | 阶段3-01/03 |
 | MCP Server 部署与安全隔离 | ✅ | 阶段3-05 |
-| Webhook / Event-driven / Durable Workflow | ✅（Event-driven 部分） | 阶段4-07；Webhook 收发、Durable 语义可并入补丁包-1 补强 |
-| **A2A、Agent-to-Agent 通信** | ❌ | **补丁包-1** |
+| Webhook / Event-driven / Durable Workflow | ✅（Event-driven 部分） | 阶段4-07；Webhook 收发、Durable 语义在阶段7-01补强 |
+| **A2A、Agent-to-Agent 通信** | ❌ | **阶段7-01** |
 
 ### 5. Agent 工程化（阶段 5 主体，目前无文档）
 
@@ -155,17 +155,24 @@ Agent Skills 不再作为阶段 4/5 之后的单篇补丁，而是独立成为�
 
 **验收**：能说明 Skill 与 Tool、Prompt、Workflow、Memory、MCP 的边界；能按角色或租户加载 Skill；能用无 Skill/有 Skill 对照评测证明收益、成本和失败模式。
 
-### 能力补丁包（阶段 6 之后，补能力模型残留缺口，约 1~2 周）
+### 阶段 7：Agent 高阶能力补全（新增主线，约 3~4 周）
 
-这些是阶段 0~5 资料都没覆盖、但能力模型明确列出的条目：
+原能力补丁包升级为正式阶段，按 [阶段 7 README](阶段7-Agent高阶能力补全/README.md) 顺序学习 01→06。
 
-| 补丁 | 主题 | 覆盖能力 | 建议形式 |
-| --- | --- | --- | --- |
-| 1 | **A2A 与 Agent 间通信**：A2A 协议（Agent Card/Task 生命周期）、Webhook 收发、Durable Workflow 语义、与 MCP 的定位区别（MCP=能力接入，A2A=Agent 协作） | 能力模型 4 | 概念 + 小型 demo |
-| 2 | **Memory 设计**：短期/长期记忆、向量记忆（对话摘要、用户画像）、LangGraph Store、记忆读写时机与隐私边界 | 能力模型 3 | 概念 + 练习 |
-| 3 | **Reflection 模式**：Self-Critique、Plan-and-Execute、ReAct + Reflection 组合、输出修正循环 | 能力模型 3 | 概念 + 模式实现 |
-| 4 | **多模态与 Responses API**：图像/文档输入、OpenAI Responses API 与 Chat API 差异（含 Function Calling 演变）、多模态工具调用 | 能力模型 1 | 1 篇文档 |
-| 5 | **幂等与补偿机制**：写操作幂等键、分布式事务补偿（Saga 类比）、长任务的部分成功回滚 | 能力模型 3 | 概念 + 设计题 |
+学习顺序：
+
+```text
+01 A2A 与 Agent-to-Agent 通信
+  -> 02 Agent Memory 设计与实现
+  -> 03 Reflection 与自我修正工作流
+  -> 04 多模态输入与 Responses API
+  -> 05 幂等、补偿与可靠执行
+  -> 06 综合实践：可靠的多 Agent 研发流程
+```
+
+产出：为阶段 4 研发效能 Agent 增加 A2A、Memory、Reflection、多模态和可靠写入能力，并完成评测、Trace 和故障演练。
+
+**验收**：能实现任务型 A2A 调用；区分 Checkpoint、短期记忆、长期记忆和 RAG；设计带预算的 Reflection 循环；处理多模态输入；为写操作实现幂等键、补偿和人工接管。
 
 ### 选学包 A：平台能力扩展（按需 1~2 周/项，不进主线）
 
@@ -195,15 +202,15 @@ LlamaIndex（数据/RAG 框架）、OpenAI Agents SDK（Guardrails/Handoff/Traci
 
 ---
 
-## 三、时间表（第 4~6 个月）
+## 三、时间表（第 4~7 个月）
 
 | 时间 | 内容 | 里程碑 |
 | --- | --- | --- |
 | 第 4 个月 | 阶段 4 文档 01~08 + 研发效能 Agent | 作品集项目三完成 |
 | 第 5 个月 | 阶段 5 文档 01~08 + 对已有项目做评测/观测/加固改造 | 项目 README 有实测指标 |
 | 第 6 个月前半月 | 阶段 6 文档 01~04 + Skill 综合实践 | Skill 能力包可运行、可评测 |
-| 第 6 个月中后段 | 补丁包 1~5 + 框架了解包 + Java 拓展练习 | 残留能力补齐 |
-| 第 6 个月最后阶段 | 作品集整合 + 简历指标 + 面试演练 | 三个项目可演示、可讲解 |
+| 第 6 个月中后段 | 框架了解包 + Java 拓展练习 + 作品集整合 | 三个项目可演示、可讲解 |
+| 第 7 个月 | 阶段 7 文档 01~06 + 综合实践 | 高阶能力闭环完成 |
 
 ## 四、终点验收清单（对照能力模型逐项勾选）
 
@@ -214,5 +221,6 @@ LlamaIndex（数据/RAG 框架）、OpenAI Agents SDK（Guardrails/Handoff/Traci
 - [ ] 能力模型 5：Agent 工程化（评测集、指标、观测、安全评测、版本管理）
 - [ ] 能力模型 6：Python 平台能力（DB/缓存/任务/监控/部署，选学项至少 Docker + 一种监控）
 - [ ] 阶段 6：Agent Skills（开放格式、Runtime 接入、权限治理、评测与 Trace）
+- [ ] 阶段 7：Agent 高阶能力补全（A2A、Memory、Reflection、多模态、幂等与补偿）
 - [ ] Java 拓展小练习完成
 - [ ] 三个作品集项目均有 README + 实测指标
