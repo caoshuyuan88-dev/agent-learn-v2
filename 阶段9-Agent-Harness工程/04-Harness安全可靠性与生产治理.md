@@ -1,111 +1,95 @@
 # Harness 安全、可靠性与生产治理
 
-## 一、Harness 的安全边界
+## 一、先画信任边界
 
-不能依赖模型自己遵守安全规则。安全边界应由 Harness、Tool Gateway、Sandbox 和平台权限强制执行。
+**来源**：[Symphony Spec §15](https://github.com/openai/symphony/blob/main/SPEC.md)，[Docker Security](https://docs.docker.com/engine/security/)
 
-重点保护：
-
-- 文件系统和代码仓库；
-- API 密钥、OAuth Token 和环境变量；
-- 数据库和生产系统；
-- 用户数据与租户边界；
-- 运行资源、费用和调用配额；
-- 生成的补丁、报告和外部通知。
-
-## 二、权限模型
-
-建议将权限分成：
+至少区分五类不可信输入：用户提示、Issue 内容、仓库源码、Tool 返回和外部文档。它们都可能诱导 Agent 执行越权操作。生产系统应明确：Agent 可访问什么、可修改什么、可联网到哪里、何时必须人工确认。
 
 ```text
-身份认证
-  -> 租户 / 用户 / Agent 身份
-  -> Tool Scope
-  -> Workspace Scope
-  -> 文件路径 Scope
-  -> 操作级审批
+Untrusted Task/Repo -> Harness Policy -> Sandbox/Tool Gateway -> Protected Systems
 ```
 
-示例：
+Prompt 只是建议；授权必须在 Tool Gateway、IAM、Sandbox 和网络策略中执行。
 
-| 操作 | 默认策略 |
-|---|---|
-| 读取项目源码 | 允许工作区内读取 |
-| 修改源码 | 允许但记录 Diff，或需要审批 |
-| 执行测试 | 允许沙箱执行 |
-| 安装依赖 | 受限，需网络策略 |
-| 访问生产数据库 | 默认拒绝 |
-| 删除文件 | 默认拒绝或人工审批 |
-| 发布 / 发通知 | 人工审批 |
+## 二、最小权限与密钥隔离
 
-## 三、Sandbox 与密钥
+**来源**：[Deep Agents Permissions](https://docs.langchain.com/oss/python/deepagents/permissions)，[GitHub Actions Secure Use](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)
 
-Sandbox 主要解决代码和命令执行隔离，但不是万能安全边界。仍需配置：
+原则：默认拒绝，显式放行，权限按任务最小化。代码 Agent 不应直接读取 `.env`、云凭据、Docker socket 或生产 DB。Tool 使用服务端受控凭据，Agent 子进程只接收结果。
 
-- CPU、内存、磁盘和时间限制；
-- 网络 allowlist；
-- 文件系统挂载范围；
-- 进程和系统调用限制；
-- 依赖安装策略；
-- 输出和日志脱敏。
+```python
+# 顺序重要：第一条命中即生效
+permissions = [
+    ("deny", "read", "/workspace/.env"),
+    ("allow", "read", "/workspace/**"),
+    ("allow", "write", "/workspace/**"),
+    ("deny", "read,write", "/**"),
+]
+```
 
-不要把原始密钥直接写入 Sandbox 环境。优先使用受控的认证代理、短期 Token 或按请求注入。
+CI 中 `GITHUB_TOKEN` 默认为只读，需要写权限的 job 单独提升；第三方 Action 固定到完整 commit SHA；不可信 PR 不运行带密钥的 `pull_request_target` 工作流。
 
-## 四、可靠性控制
+## 三、审批与副作用
 
-Harness 至少应具备：
+**来源**：[Deep Agents Production: Guardrails](https://docs.langchain.com/oss/python/deepagents/going-to-production)，[Symphony Spec §10, §15](https://github.com/openai/symphony/blob/main/SPEC.md)
 
-- 最大循环次数；
-- 最大总执行时间；
-- 单工具 Timeout；
-- 重试和退避；
-- 限流和熔断；
-- Checkpoint 和恢复；
-- 幂等键；
-- 取消和人工接管；
-- 失败分类和死信任务。
+操作分级：
 
-不要把“自动重试”设计成无限循环。重试只适合临时故障，参数错误、权限错误和业务拒绝应尽快停止。
+| 风险 | 例子 | 策略 |
+|---|---|---|
+| 低 | 读源码、跑单测 | 自动允许 |
+| 中 | 改代码、装依赖、建分支 | Sandbox + 审计 |
+| 高 | 发 PR、修改云资源、发通知 | 人工审批 |
+| 禁止 | 读生产密钥、删除生产数据 | 拒绝 |
 
-## 五、生产指标
+审批请求必须绑定 `run_id`、操作、参数摘要、影响范围、有效期和审批人；不能只批准“这个 Agent”。
+
+## 四、可靠性：超时、重试、幂等、恢复
+
+**来源**：[Symphony Spec §8, §14](https://github.com/openai/symphony/blob/main/SPEC.md)，[Temporal Idempotency](https://docs.temporal.io/activity-definition)
+
+定义四种时限：API 请求、单 Tool、无事件 stall、Run 总时长。重试前先分类：网络/5xx 可退避重试；4xx、验证失败、权限拒绝、预算超限应停止。
+
+每个外部写入携带稳定幂等键：
 
 ```text
-run_success_rate
+key = hash(tenant_id + task_id + step_name + target_id)
+```
+
+恢复时不能依据“上次可能没做完”再次写入；先查询幂等记录或下游状态。部分成功则记录补偿状态或转人工。
+
+## 五、观测、SLO 与审计
+
+**来源**：[OpenTelemetry Trace API](https://opentelemetry.io/docs/specs/otel/trace/api/)，[Google SRE Monitoring](https://sre.google/workbook/monitoring/)
+
+每个 Run 建根 Span，Tool、模型、验证、审批、Sandbox 为子 Span。跨队列/远程 Agent 使用 W3C Trace Context 传播。Span 名用低基数操作名，例如 `harness.verify_test`，把 `run_id` 放 attribute，而不是拼到 span 名。
+
+核心指标：
+
+```text
 run_completion_rate
 verification_pass_rate
+repair_success_rate
 human_escalation_rate
-loop_limit_rate
 tool_error_rate
-sandbox_failure_rate
-p95_run_latency
-input_output_tokens
+sandbox_violation_count
+p95_run_duration
 cost_per_completed_task
-workspace_cleanup_failure_rate
 ```
 
-还要按模型、Agent、Skill、工具、租户和任务类型分组，否则平均数会掩盖局部问题。
+告警使用聚合指标，排障使用 Trace/结构化日志。指标标签不要放高基数 `task_id` 或完整路径。审计记录“谁在何时批准了什么”，但日志必须脱敏并设置保留期。
 
-## 六、审计与隐私
+## 六、上线门禁
 
-一次 Run 至少能追溯：
+**来源**：[GitHub Actions Secure Use](https://docs.github.com/en/actions/security-for-github-actions/security-guides/security-hardening-for-github-actions)，[SWE-bench](https://github.com/SWE-bench/SWE-bench)
 
-```text
-谁发起
-使用哪个 Agent / Model / Prompt / Skill
-访问了哪些文件
-调用了哪些工具
-修改了什么
-执行了哪些验证
-谁批准了高风险动作
-最终产生了什么结果
-```
+上线前最低检查：威胁建模、Sandbox 逃逸测试、权限拒绝测试、失败重试/重复写入测试、Golden Task 回归、负载和成本上限、告警演练、回滚演练。先在受控内部仓库和非生产凭据中运行，再逐步扩大自主范围。
 
-Trace 中不要默认保存完整 Prompt、源码、Token 或个人信息。应根据敏感级别做脱敏、采样、访问控制和保留期限管理。
+## 七、验收
 
-## 七、练习
-
-1. 为 Coding Agent 编写权限矩阵。
-2. 设计一个 Sandbox 配置清单。
-3. 模拟工具超时、Worker 崩溃、重复提交和权限拒绝。
-4. 统计 100 次运行的完成率、验证通过率、P95 和成本。
-5. 为一次高风险写操作实现审批和审计回放。
+- 写出能力-权限-审批矩阵；
+- 验证 Agent 无法读取 `.env`、Docker socket 和工作区外文件；
+- 模拟 timeout、重复投递、Worker 崩溃、拒绝和补偿；
+- 用 Trace 还原一次失败 Run；
+- 为完成率、验证通过率、P95 和安全拒绝率设置告警与负责人。

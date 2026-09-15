@@ -1,100 +1,101 @@
 # Agent Harness 概念与分层架构
 
-## 一、为什么需要 Harness
+## 一、定义与边界
 
-一个简单 Agent 可以是：
+**来源**：[OpenAI Harness Engineering](https://openai.com/index/harness-engineering/)，[Deep Agents Overview](https://docs.langchain.com/oss/python/deepagents/overview)
 
-```text
-LLM -> Tool -> Tool Result -> LLM -> Final Answer
-```
-
-但真实任务会遇到：
-
-- 需要读取大量仓库或业务上下文；
-- 工具和文件操作有权限边界；
-- 任务运行数分钟甚至数小时；
-- 工具调用会超时、失败或产生副作用；
-- 结果必须通过测试或业务检查；
-- Agent 需要在失败后继续，而不是从头开始；
-- 多用户和多任务必须隔离；
-- 运行结果需要可审计、可回放和可评测。
-
-Harness 就是为这些问题提供共同运行机制的层。
-
-## 二、Harness 与相邻概念
-
-| 概念 | 主要职责 |
-|---|---|
-| Model | 生成决策、文本或工具调用 |
-| Agent Loop | 根据模型和工具结果循环执行 |
-| Tool / MCP | 提供具体动作或外部能力 |
-| Workflow | 编排固定步骤、分支和状态 |
-| Runtime | 执行 Agent、管理上下文和生命周期 |
-| Harness | 在 Runtime 外组织工具、环境、反馈、验证、恢复和治理 |
-| Agent Platform | 提供部署、租户、资源、配置和运营能力 |
-
-不同厂商对 Harness 的边界可能不同，但核心思想是：**模型不是完整产品，模型周围的执行和反馈系统决定了 Agent 能否可靠完成任务。**
-
-## 三、典型分层
+Harness 是围绕 Agent Loop 建立的工程系统：向 Agent 提供上下文、受控执行环境、可验证反馈、恢复机制和运营控制。它不是模型，不是单个 Tool，也不是只负责画流程图的 Workflow。
 
 ```text
-Product / Task Layer
-  任务、验收标准、用户体验
-
-Harness Layer
-  Agent Loop、Planning、Skills、Context、Verification、Recovery
-
-Runtime Layer
-  State、Checkpoint、Streaming、Subagent、Middleware
-
-Execution Layer
-  Tools、MCP、Filesystem、Sandbox、Browser、Repository
-
-Governance Layer
-  Auth、Permissions、Approval、Audit、Limits、Policy
-
-Observability / Evaluation Layer
-  Traces、Logs、Metrics、Golden Tasks、Regression、Reports
+Agent Loop：模型决定下一步，调用工具，读取结果
+Harness： 为这个循环提供任务、工作区、工具、权限、验证、状态、Trace 与停止规则
 ```
 
-## 四、Harness 的最小闭环
+企业中应区分：
+
+| 层 | 回答的问题 | 典型实现 |
+|---|---|---|
+| Agent | 下一步做什么 | LLM + Tool Calling |
+| Runtime | 一次 Run 如何执行/暂停/恢复 | LangGraph、Deep Agents |
+| Harness | Agent 如何在环境中可靠完成任务 | Workspace、Sandbox、验证、反馈、调度 |
+| Platform | 如何多租户部署和运营 | K8s、IAM、队列、监控、CI/CD |
+
+## 二、为什么生产环境需要 Harness
+
+**来源**：[OpenAI Symphony Spec §1-3](https://github.com/openai/symphony/blob/main/SPEC.md)，[Anthropic Effective Agents](https://www.anthropic.com/engineering/building-effective-agents)
+
+一个“LLM 调工具”的 Demo 缺少四类生产能力：
+
+1. **任务身份**：任务重复投递时，哪个 Run 可以执行？
+2. **环境隔离**：命令、文件、依赖和凭据是否只能在该任务工作区使用？
+3. **客观验证**：结果是否通过测试、构建、Schema 或人工审批？
+4. **恢复与可追踪**：超时、进程崩溃、取消后如何处理，事后怎样解释？
+
+对 Coding Agent，正确闭环是：
 
 ```text
-Understand
-  -> Plan
-  -> Act
-  -> Observe
-  -> Verify
-  -> Repair or Finish
+Issue -> 创建工作区 -> 探索/计划 -> 修改 -> test/lint/typecheck
+      -> 读取失败 -> 有限修复 -> 生成证据 -> 审批/PR/结束
 ```
 
-其中 `Verify` 是关键：没有测试、编译、Schema 校验、业务断言或人工确认，Agent 只是“生成了一个看起来合理的结果”。
+模型的“我已完成”不属于成功条件；验证命令的退出码、报告和审批结果才属于。
 
-## 五、Harness 的设计原则
+## 三、参考架构
 
-### 1. 让能力可发现
+**来源**：[Symphony Spec §3](https://github.com/openai/symphony/blob/main/SPEC.md)，[Deep Agents Production](https://docs.langchain.com/oss/python/deepagents/going-to-production)
 
-工具、Skill、仓库结构、运行命令和验收标准必须能被 Agent 找到。不要把所有信息塞进一份巨大 Prompt，应该提供目录、索引、链接和渐进式披露。
+```text
+API / Issue Tracker
+  -> Orchestrator: 领取、并发、重试、取消、协调
+  -> Workspace Manager: worktree/容器目录、基线 revision、清理
+  -> Agent Runner: prompt、session、工具事件、预算
+  -> Verification Runner: lint、test、build、e2e、评测
+  -> Policy Gateway: IAM、审批、命令/网络/路径限制
+  -> Event Store + OTel: 事件、trace、指标、证据
+```
 
-### 2. 让行为可验证
+边界纪律：Orchestrator 不理解 GitHub/Jira 的私有字段；Adapter 归一化外部任务。Agent 不直接拿生产密钥；受控 Tool 在宿主服务或专用网关执行。验证器不依赖模型文字结论。
 
-把“做好这个任务”转换成可执行检查：测试、Lint、类型检查、截图、指标、Schema、Diff 检查或人工审批。
+## 四、核心状态机
 
-### 3. 让边界可执行
+**来源**：[Symphony Spec §7, §14](https://github.com/openai/symphony/blob/main/SPEC.md)
 
-权限不能只写在 Prompt 中。文件路径、工具操作、网络访问、命令、密钥和写入动作都应由 Runtime 或 Sandbox 强制执行。
+```text
+queued -> preparing -> running -> verifying -> completed
+                         |            |
+                         v            v
+                   waiting_approval  repairing -> verifying
+                         |
+                         v
+                   canceled / failed / timed_out
+```
 
-### 4. 让失败可恢复
+需要分别记录 `run_id`、`task_id`、`workspace_id`、`attempt`、`base_revision`。`completed` 只表示验证与交付策略均通过，不代表 Issue 已自动关闭。
 
-保存状态、工具结果、检查点和失败原因，允许重试、回滚、补偿或人工接管。
+## 五、最小数据模型
 
-### 5. 让运行可解释
+**来源**：[Symphony Spec §4](https://github.com/openai/symphony/blob/main/SPEC.md)
 
-记录模型版本、Prompt、Skill、工具、输入输出摘要、验证结果和最终决策，保证问题能够回放。
+```python
+from dataclasses import dataclass
+from typing import Literal
 
-## 六、练习
 
-1. 画出阶段 4 研发效能 Agent 的 Harness 分层图。
-2. 为一个“修复测试失败”的任务写出 Understand/Plan/Act/Observe/Verify 闭环。
-3. 列出当前项目中仍依赖自然语言、没有被机械强制的 10 条规则。
-4. 区分哪些能力应该放在 Agent 内，哪些应该放在 Harness 或平台层。
+@dataclass(frozen=True)
+class Run:
+    run_id: str
+    task_id: str
+    workspace_id: str
+    base_revision: str
+    attempt: int
+    status: Literal["queued", "running", "verifying", "completed", "failed"]
+```
+
+`base_revision` 用于证明 Agent 面对的是哪一版源码；`attempt` 区分首次执行和重试；它们都是排障、幂等和审计的基础。
+
+## 六、验收
+
+- 能画出 Agent、Runtime、Harness、Platform 的边界；
+- 能为一个代码任务定义状态、终止条件和验证证据；
+- 能说明为什么“模型自评成功”不能替代测试；
+- 能列出至少三个必须在 Harness 强制、不能只写 Prompt 的规则。

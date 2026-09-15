@@ -4,6 +4,8 @@
 
 ## 一、Harness 是什么
 
+**本节依据**：[OpenAI Harness Engineering](https://openai.com/index/harness-engineering/)，[Deep Agents Overview](https://docs.langchain.com/oss/python/deepagents/overview)
+
 Agent Harness 不是单独的模型、Tool 或 Workflow，而是包围 Agent Loop 的工程运行层：
 
 ```text
@@ -25,6 +27,8 @@ Harness = 让决策者能够安全工作、验证结果并持续恢复的工作�
 ```
 
 Deep Agents 是 Agent Harness 的一个具体实现；OpenAI Harness Engineering 更偏向一套面向 Agent 的软件工程方法和运行环境设计。
+
+本阶段以企业内部 Coding Agent 为统一案例：Agent 从 Issue 获取任务，在独立 Workspace/Sandbox 中修改代码，用测试和 CI 作为事实依据，再将可审查证据交给人或发布流程。它不讨论把 Agent 直接连接到生产数据库或让 Agent 无审批自动合并代码。
 
 ## 二、学习文档
 
@@ -58,6 +62,8 @@ Deep Agents 是 Agent Harness 的一个具体实现；OpenAI Harness Engineering
 
 ## 五、最终产出
 
+**本节依据**：[OpenAI Symphony Spec](https://github.com/openai/symphony/blob/main/SPEC.md)，[Claude Code Best Practices](https://code.claude.com/docs/en/best-practices)
+
 构建一个最小 Coding Agent Harness：
 
 - 接收 Issue 或任务描述；
@@ -69,7 +75,23 @@ Deep Agents 是 Agent Harness 的一个具体实现；OpenAI Harness Engineering
 - 生成包含 diff、测试、Trace 和风险的交付报告；
 - 失败或高风险时暂停并请求人工审批。
 
-## 资料依据
+## 六、建议学习方式
+
+1. 先读 01，写出你当前项目的 Harness 分层与信任边界。
+2. 再读 02，在本机为单个任务创建独立临时工作区，并实现超时与取消。
+3. 读 03 后，为一个真实测试失败生成结构化反馈，手动模拟 Agent 修复循环。
+4. 读 04 后，给工作区、命令、网络和密钥写出默认拒绝的权限矩阵。
+5. 最后按 05 实现综合实践；先只接内部测试仓库和非生产凭据。
+
+## 七、完成标准
+
+- 每个 Run 都能关联 `task_id`、`run_id`、`workspace_id` 和基线 revision；
+- Agent 只能在授权的隔离环境中执行，不能读取宿主密钥或工作区外文件；
+- “完成”必须有测试、构建、评测或审批等外部证据；
+- 失败后最多有限次修复，超时、取消、权限拒绝和环境故障均有明确状态；
+- 指标、Trace、审计和产物足以让另一位工程师复核一次 Run。
+
+## 八、资料依据
 
 - [OpenAI Harness Engineering](https://openai.com/index/harness-engineering/)
 - [OpenAI Symphony](https://github.com/openai/symphony)
